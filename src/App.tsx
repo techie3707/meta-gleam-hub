@@ -9,6 +9,7 @@ import Import from "./pages/Import";
 import Collections from "./pages/Collections";
 import Documents from "./pages/Documents";
 import Tasks from "./pages/Tasks";
+import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/collections" element={<Collections />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/tasks" element={<Tasks />} />
+          <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

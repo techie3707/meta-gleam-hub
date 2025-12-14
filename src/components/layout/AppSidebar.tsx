@@ -11,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Library,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Collections", href: "/collections", icon: FolderOpen },
   { name: "Documents", href: "/documents", icon: FileText },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
+  { name: "Billing", href: "/billing", icon: Receipt },
 ];
 
 const bottomNav = [
