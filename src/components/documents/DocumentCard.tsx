@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-interface Document {
+export interface Document {
   id: string;
   title: string;
   type: "pdf" | "doc" | "xls" | "image" | "other";
@@ -32,22 +32,34 @@ const typeConfig = {
 interface DocumentCardProps {
   document: Document;
   variant?: "grid" | "list";
+  onClick?: () => void;
 }
 
-export function DocumentCard({ document, variant = "grid" }: DocumentCardProps) {
+export function DocumentCard({ document, variant = "grid", onClick }: DocumentCardProps) {
   const config = typeConfig[document.type];
   const Icon = config.icon;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Prevent click when clicking on dropdown menu
+    if ((e.target as HTMLElement).closest('[data-radix-dropdown-menu-trigger]')) {
+      return;
+    }
+    onClick?.();
+  };
+
   if (variant === "list") {
     return (
-      <div className="document-card flex items-start gap-4 hover:shadow-card-hover">
+      <div
+        className="document-card flex items-start gap-4 hover:shadow-card-hover cursor-pointer"
+        onClick={handleCardClick}
+      >
         <div className={cn("p-3 rounded-lg flex-shrink-0", config.bgColor)}>
           <Icon className={cn("w-6 h-6", config.color)} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
+              <h3 className="font-semibold text-foreground hover:text-primary transition-colors">
                 {document.title}
               </h3>
               <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -56,14 +68,19 @@ export function DocumentCard({ document, variant = "grid" }: DocumentCardProps) 
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="flex-shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onClick?.()}>
                   <Eye className="w-4 h-4 mr-2" />
-                  View
+                  View Details
                 </DropdownMenuItem>
                 <DropdownMenuItem>
                   <Download className="w-4 h-4 mr-2" />
@@ -100,7 +117,10 @@ export function DocumentCard({ document, variant = "grid" }: DocumentCardProps) 
   }
 
   return (
-    <div className="document-card hover:shadow-card-hover group">
+    <div
+      className="document-card hover:shadow-card-hover group cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="flex items-start justify-between">
         <div className={cn("p-2.5 rounded-lg", config.bgColor)}>
           <Icon className={cn("w-5 h-5", config.color)} />
