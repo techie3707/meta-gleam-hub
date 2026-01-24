@@ -8,6 +8,7 @@ import Search from "./pages/Search";
 import Import from "./pages/Import";
 import Collections from "./pages/Collections";
 import Documents from "./pages/Documents";
+import DocumentDetail from "./pages/DocumentDetail";
 import Tasks from "./pages/Tasks";
 import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/import" element={<Import />} />
           <Route path="/collections" element={<Collections />} />
           <Route path="/documents" element={<Documents />} />
+          <Route path="/documents/:id" element={<DocumentDetail />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/settings" element={<Settings />} />

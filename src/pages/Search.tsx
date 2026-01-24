@@ -11,8 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DocumentCard, type Document } from "@/components/documents/DocumentCard";
-import { DocumentDetailDialog } from "@/components/documents/DocumentDetailDialog";
+import { DocumentCard } from "@/components/documents/DocumentCard";
 
 const mockResults = [
   {
@@ -79,13 +78,6 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All Documents");
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-
-  const handleDocumentClick = (doc: Document) => {
-    setSelectedDocument(doc);
-    setDetailDialogOpen(true);
-  };
 
   return (
     <AppLayout>
@@ -238,17 +230,11 @@ const Search = () => {
           <div className="grid grid-cols-1 gap-4">
             {mockResults.map((doc, index) => (
               <div key={doc.id} style={{ animationDelay: `${index * 50}ms` }} className="animate-slide-up">
-                <DocumentCard document={doc} variant="list" onClick={() => handleDocumentClick(doc)} />
+                <DocumentCard document={doc} variant="list" />
               </div>
             ))}
           </div>
         </div>
-
-        <DocumentDetailDialog
-          document={selectedDocument}
-          open={detailDialogOpen}
-          onOpenChange={setDetailDialogOpen}
-        />
       </div>
     </AppLayout>
   );

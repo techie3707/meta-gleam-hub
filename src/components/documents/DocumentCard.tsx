@@ -1,4 +1,5 @@
 import { FileText, Image, FileSpreadsheet, File, MoreVertical, Download, Eye, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
@@ -32,10 +33,10 @@ const typeConfig = {
 interface DocumentCardProps {
   document: Document;
   variant?: "grid" | "list";
-  onClick?: () => void;
 }
 
-export function DocumentCard({ document, variant = "grid", onClick }: DocumentCardProps) {
+export function DocumentCard({ document, variant = "grid" }: DocumentCardProps) {
+  const navigate = useNavigate();
   const config = typeConfig[document.type];
   const Icon = config.icon;
 
@@ -44,7 +45,11 @@ export function DocumentCard({ document, variant = "grid", onClick }: DocumentCa
     if ((e.target as HTMLElement).closest('[data-radix-dropdown-menu-trigger]')) {
       return;
     }
-    onClick?.();
+    navigate(`/documents/${document.id}`);
+  };
+
+  const handleViewDetails = () => {
+    navigate(`/documents/${document.id}`);
   };
 
   if (variant === "list") {
@@ -78,7 +83,7 @@ export function DocumentCard({ document, variant = "grid", onClick }: DocumentCa
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onClick?.()}>
+                <DropdownMenuItem onClick={handleViewDetails}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
                 </DropdownMenuItem>

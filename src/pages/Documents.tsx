@@ -3,8 +3,7 @@ import { Grid, List, Filter, SortAsc } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DocumentCard, type Document } from "@/components/documents/DocumentCard";
-import { DocumentDetailDialog } from "@/components/documents/DocumentDetailDialog";
+import { DocumentCard } from "@/components/documents/DocumentCard";
 import { cn } from "@/lib/utils";
 
 const mockDocuments = [
@@ -93,17 +92,10 @@ const mockDocuments = [
 const Documents = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const filteredDocuments = mockDocuments.filter((doc) =>
     doc.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const handleDocumentClick = (doc: Document) => {
-    setSelectedDocument(doc);
-    setDetailDialogOpen(true);
-  };
 
   return (
     <AppLayout>
@@ -170,7 +162,7 @@ const Documents = () => {
                 style={{ animationDelay: `${index * 50}ms` }}
                 className="animate-slide-up"
               >
-                <DocumentCard document={doc} variant="grid" onClick={() => handleDocumentClick(doc)} />
+                <DocumentCard document={doc} variant="grid" />
               </div>
             ))}
           </div>
@@ -182,17 +174,11 @@ const Documents = () => {
                 style={{ animationDelay: `${index * 50}ms` }}
                 className="animate-slide-up"
               >
-                <DocumentCard document={doc} variant="list" onClick={() => handleDocumentClick(doc)} />
+                <DocumentCard document={doc} variant="list" />
               </div>
             ))}
           </div>
         )}
-
-        <DocumentDetailDialog
-          document={selectedDocument}
-          open={detailDialogOpen}
-          onOpenChange={setDetailDialogOpen}
-        />
       </div>
     </AppLayout>
   );
