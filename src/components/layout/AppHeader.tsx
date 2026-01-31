@@ -10,12 +10,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function AppHeader() {
   const navigate = useNavigate();
+  const { logout, isAdmin } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   return (
-    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm px-6 flex items-center justify-between gap-4">
+    <header className="h-16 border-b border-border bg-card/50 backdrop-blur-sm px-6 flex items-center justify-between gap-4 flex-shrink-0">
       {/* Search Bar */}
       <div className="flex-1 max-w-xl">
         <div className="relative">
@@ -24,6 +31,14 @@ export function AppHeader() {
             type="text"
             placeholder="Search documents, collections..."
             className="pl-10 bg-secondary/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const value = (e.target as HTMLInputElement).value;
+                if (value) {
+                  navigate(`/search?query=${encodeURIComponent(value)}`);
+                }
+              }
+            }}
           />
         </div>
       </div>
@@ -55,11 +70,22 @@ export function AppHeader() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            {isAdmin && (
+              <DropdownMenuItem className="text-xs text-primary">
+                Administrator
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Preferences</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/settings")}>
+              Preferences
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Sign out</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+              Sign out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

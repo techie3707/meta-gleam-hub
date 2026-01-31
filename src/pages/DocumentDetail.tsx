@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import {
@@ -21,6 +21,8 @@ import {
   Share2,
   Edit,
   Trash2,
+  Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -29,106 +31,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-
-// Mock documents data (in real app, this would come from API/context)
-const mockDocuments = [
-  {
-    id: "1",
-    title: "Annual Financial Report 2024",
-    type: "pdf" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 0, 15),
-    size: "2.4 MB",
-    author: "John Smith",
-    description: "Comprehensive annual financial report covering all quarters of 2024 with detailed analysis and projections.",
-    tags: ["finance", "annual", "report", "2024"],
-  },
-  {
-    id: "2",
-    title: "Project Alpha - Technical Specifications",
-    type: "doc" as const,
-    collection: "Technical Docs",
-    uploadedAt: new Date(2024, 1, 20),
-    size: "1.8 MB",
-    author: "Sarah Johnson",
-    description: "Complete technical specifications for Project Alpha including architecture diagrams and API documentation.",
-    tags: ["technical", "specs", "project-alpha"],
-  },
-  {
-    id: "3",
-    title: "Q3 Budget Analysis Spreadsheet",
-    type: "xls" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 2, 10),
-    size: "956 KB",
-    author: "Mike Davis",
-    description: "Detailed budget analysis for Q3 with variance reports and forecasting data.",
-    tags: ["budget", "Q3", "analysis"],
-  },
-  {
-    id: "4",
-    title: "Marketing Campaign Assets",
-    type: "image" as const,
-    collection: "Media Library",
-    uploadedAt: new Date(2024, 3, 5),
-    size: "15.2 MB",
-    author: "Emily Chen",
-    description: "Collection of marketing campaign visuals including banners, social media graphics, and promotional materials.",
-    tags: ["marketing", "assets", "campaign"],
-  },
-  {
-    id: "5",
-    title: "Employee Handbook 2024",
-    type: "pdf" as const,
-    collection: "HR Documents",
-    uploadedAt: new Date(2024, 0, 1),
-    size: "3.2 MB",
-    author: "HR Department",
-    description: "Updated employee handbook with policies, procedures, and guidelines for all staff members.",
-    tags: ["HR", "handbook", "policies"],
-  },
-  {
-    id: "6",
-    title: "API Documentation v2.0",
-    type: "doc" as const,
-    collection: "Technical Docs",
-    uploadedAt: new Date(2024, 4, 12),
-    size: "2.1 MB",
-    author: "Dev Team",
-    description: "Complete API documentation with endpoints, authentication, and usage examples.",
-    tags: ["API", "documentation", "v2"],
-  },
-  {
-    id: "7",
-    title: "Sales Report Q1 2024",
-    type: "xls" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 3, 1),
-    size: "1.4 MB",
-    author: "Sales Team",
-    description: "Q1 sales performance report with regional breakdowns and trend analysis.",
-    tags: ["sales", "Q1", "report"],
-  },
-  {
-    id: "8",
-    title: "Brand Guidelines",
-    type: "pdf" as const,
-    collection: "Media Library",
-    uploadedAt: new Date(2024, 2, 15),
-    size: "8.5 MB",
-    author: "Design Team",
-    description: "Company brand guidelines including logo usage, color palette, typography, and visual standards.",
-    tags: ["brand", "guidelines", "design"],
-  },
-];
-
-interface ActionHistoryItem {
-  id: string;
-  action: string;
-  user: string;
-  timestamp: Date;
-  details?: string;
-}
+import { 
+  fetchItemWithBitstreams, 
+  downloadBitstream, 
+  getMetadataValue, 
+  getMetadataValues,
+  fetchOwningCollection,
+  deleteItem,
+  Item,
+  Bitstream,
+} from "@/api/itemApi";
+import { siteConfig } from "@/config/siteConfig";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Comment {
   id: string;
@@ -152,20 +67,7 @@ const typeConfig = {
   other: { icon: File, color: "text-document-other", bgColor: "bg-document-other/10", label: "Other File" },
 };
 
-const mockActionHistory: ActionHistoryItem[] = [
-  { id: "1", action: "Document Uploaded", user: "John Smith", timestamp: new Date(2024, 0, 15, 10, 30), details: "Initial upload" },
-  { id: "2", action: "Metadata Updated", user: "Sarah Johnson", timestamp: new Date(2024, 0, 16, 14, 15), details: "Added tags and description" },
-  { id: "3", action: "Document Viewed", user: "Mike Davis", timestamp: new Date(2024, 0, 17, 9, 45) },
-  { id: "4", action: "Comment Added", user: "Emily Chen", timestamp: new Date(2024, 0, 18, 11, 20), details: "Review feedback" },
-  { id: "5", action: "Document Downloaded", user: "John Smith", timestamp: new Date(2024, 0, 19, 16, 0) },
-];
-
-const mockComments: Comment[] = [
-  { id: "1", user: "Sarah Johnson", text: "Great document! The analysis is very thorough.", timestamp: new Date(2024, 0, 16, 14, 30) },
-  { id: "2", user: "Mike Davis", text: "Could you add more details on section 3?", timestamp: new Date(2024, 0, 17, 10, 15) },
-  { id: "3", user: "Emily Chen", text: "I've reviewed and approved this document.", timestamp: new Date(2024, 0, 18, 11, 20) },
-];
-
+// Mock data for signatures and comments (would come from API in real implementation)
 const mockSignatures: Signature[] = [
   { id: "1", user: "John Smith", signedAt: new Date(2024, 0, 15, 10, 35), status: "signed" },
   { id: "2", user: "Sarah Johnson", signedAt: new Date(2024, 0, 16, 15, 0), status: "signed" },
@@ -189,12 +91,120 @@ function MetadataItem({ icon: Icon, label, value }: { icon: any; label: string; 
 const DocumentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { isAdmin } = useAuth();
+  
+  const [item, setItem] = useState<Item | null>(null);
+  const [collection, setCollection] = useState<{ id: string; name: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
-  const [comments, setComments] = useState(mockComments);
+  const [comments, setComments] = useState<Comment[]>([
+    { id: "1", user: "Sarah Johnson", text: "Great document! The analysis is very thorough.", timestamp: new Date(2024, 0, 16, 14, 30) },
+    { id: "2", user: "Mike Davis", text: "Could you add more details on section 3?", timestamp: new Date(2024, 0, 17, 10, 15) },
+  ]);
 
-  const document = mockDocuments.find((doc) => doc.id === id);
+  useEffect(() => {
+    if (id) {
+      loadItem();
+    }
+  }, [id]);
 
-  if (!document) {
+  const loadItem = async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const itemData = await fetchItemWithBitstreams(id);
+      if (itemData) {
+        setItem(itemData);
+        const col = await fetchOwningCollection(id);
+        setCollection(col);
+      }
+    } catch (error) {
+      console.error("Failed to load item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load document details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async (bitstream: Bitstream) => {
+    setDownloading(bitstream.id);
+    try {
+      await downloadBitstream(bitstream.id, bitstream.name);
+      toast({ title: "Success", description: "Download started" });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download file",
+        variant: "destructive",
+      });
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!item || !confirm("Are you sure you want to delete this document?")) return;
+    
+    try {
+      const success = await deleteItem(item.id);
+      if (success) {
+        toast({ title: "Success", description: "Document deleted" });
+        navigate("/documents");
+      } else {
+        throw new Error("Delete failed");
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddComment = () => {
+    if (!newComment.trim()) return;
+    const comment: Comment = {
+      id: Date.now().toString(),
+      user: "Current User",
+      text: newComment,
+      timestamp: new Date(),
+    };
+    setComments([...comments, comment]);
+    setNewComment("");
+  };
+
+  // Get file type from bitstreams
+  const getFileType = (): keyof typeof typeConfig => {
+    const originalBundle = item?.bundles?.find((b) => b.name === "ORIGINAL");
+    const bitstream = originalBundle?.bitstreams?.[0];
+    if (!bitstream) return "other";
+    
+    const name = bitstream.name.toLowerCase();
+    if (name.endsWith(".pdf")) return "pdf";
+    if (name.endsWith(".doc") || name.endsWith(".docx")) return "doc";
+    if (name.endsWith(".xls") || name.endsWith(".xlsx")) return "xls";
+    if (name.match(/\.(jpg|jpeg|png|gif|webp)$/)) return "image";
+    return "other";
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-[60vh]">
+          <Loader2 className="w-8 h-8 text-primary animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!item) {
     return (
       <AppLayout>
         <div className="flex flex-col items-center justify-center h-[60vh]">
@@ -210,20 +220,25 @@ const DocumentDetail = () => {
     );
   }
 
-  const config = typeConfig[document.type];
+  const fileType = getFileType();
+  const config = typeConfig[fileType];
   const Icon = config.icon;
 
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
-    const comment: Comment = {
-      id: Date.now().toString(),
-      user: "Current User",
-      text: newComment,
-      timestamp: new Date(),
-    };
-    setComments([...comments, comment]);
-    setNewComment("");
-  };
+  const metadata = item.metadata || {};
+  const title = getMetadataValue(metadata, "dc.title", item.name);
+  const description = getMetadataValue(metadata, "dc.description.abstract") || getMetadataValue(metadata, "dc.description");
+  const author = getMetadataValue(metadata, "dc.contributor.author", "Unknown");
+  const dateIssued = getMetadataValue(metadata, "dc.date.issued");
+  const subjects = getMetadataValues(metadata, "dc.subject");
+  
+  const originalBundle = item.bundles?.find((b) => b.name === "ORIGINAL");
+  const bitstreams = originalBundle?.bitstreams || [];
+
+  // Build action history from item data
+  const actionHistory = [
+    { id: "1", action: "Document Created", user: author, timestamp: dateIssued ? new Date(dateIssued) : new Date(), details: "Initial creation" },
+    ...(item.lastModified ? [{ id: "2", action: "Last Modified", user: "System", timestamp: new Date(item.lastModified), details: "" }] : []),
+  ];
 
   return (
     <AppLayout>
@@ -238,16 +253,31 @@ const DocumentDetail = () => {
             <Button variant="outline" size="icon">
               <Share2 className="w-4 h-4" />
             </Button>
-            <Button variant="outline" size="icon">
-              <Edit className="w-4 h-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="text-destructive hover:text-destructive">
-              <Trash2 className="w-4 h-4" />
-            </Button>
-            <Button>
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
+            {isAdmin && (
+              <>
+                <Button variant="outline" size="icon">
+                  <Edit className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="text-destructive hover:text-destructive"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+            {bitstreams.length > 0 && (
+              <Button onClick={() => handleDownload(bitstreams[0])}>
+                {downloading === bitstreams[0].id ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Download
+              </Button>
+            )}
           </div>
         </div>
 
@@ -260,21 +290,25 @@ const DocumentDetail = () => {
             <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground">{document.title}</h1>
+                  <h1 className="text-2xl font-bold text-foreground">{title}</h1>
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     <Badge variant="secondary" className={cn("text-sm", config.bgColor, config.color)}>
                       {config.label}
                     </Badge>
-                    <Badge variant="outline">{document.collection}</Badge>
-                    {document.tags?.map((tag) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
+                    {collection && (
+                      <Badge variant="outline">{collection.name}</Badge>
+                    )}
+                    {subjects.slice(0, 5).map((subject) => (
+                      <Badge key={subject} variant="secondary" className="text-xs">
+                        {subject}
                       </Badge>
                     ))}
                   </div>
                 </div>
               </div>
-              <p className="text-muted-foreground mt-4 leading-relaxed">{document.description}</p>
+              {description && (
+                <p className="text-muted-foreground mt-4 leading-relaxed">{description}</p>
+              )}
             </div>
           </div>
         </div>
@@ -282,19 +316,49 @@ const DocumentDetail = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content - Left Side */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Document Preview */}
+            {/* Bitstreams / Files */}
             <div className="bg-card rounded-xl border border-border overflow-hidden">
               <div className="p-4 border-b border-border">
-                <h2 className="font-semibold text-foreground">Document Preview</h2>
+                <h2 className="font-semibold text-foreground">Files ({bitstreams.length})</h2>
               </div>
-              <div className={cn("p-16 flex flex-col items-center justify-center", config.bgColor)}>
-                <Icon className={cn("w-24 h-24 mb-4", config.color)} />
-                <p className="text-muted-foreground">Preview not available</p>
-                <Button variant="outline" className="mt-4">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download to View
-                </Button>
-              </div>
+              {bitstreams.length === 0 ? (
+                <div className={cn("p-16 flex flex-col items-center justify-center", config.bgColor)}>
+                  <Icon className={cn("w-24 h-24 mb-4", config.color)} />
+                  <p className="text-muted-foreground">No files attached</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {bitstreams.map((bitstream) => (
+                    <div key={bitstream.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={cn("p-2 rounded-lg", config.bgColor)}>
+                          <Icon className={cn("w-5 h-5", config.color)} />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{bitstream.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {bitstream.sizeBytes ? `${(bitstream.sizeBytes / 1024 / 1024).toFixed(2)} MB` : "Unknown size"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownload(bitstream)}
+                          disabled={downloading === bitstream.id}
+                        >
+                          {downloading === bitstream.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Tabs Section */}
@@ -328,9 +392,9 @@ const DocumentDetail = () => {
 
                 <TabsContent value="history" className="p-6 m-0">
                   <div className="space-y-1">
-                    {mockActionHistory.map((item, index) => (
+                    {actionHistory.map((item, index) => (
                       <div key={item.id} className="relative">
-                        {index !== mockActionHistory.length - 1 && (
+                        {index !== actionHistory.length - 1 && (
                           <div className="absolute left-[19px] top-12 bottom-0 w-0.5 bg-border" />
                         )}
                         <div className="flex gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
@@ -420,23 +484,26 @@ const DocumentDetail = () => {
                         </div>
                       </div>
                     ))}
-
-                    <Separator className="my-4" />
-
+                    
+                    <Separator />
+                    
                     <div className="flex gap-3">
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <User className="w-4 h-4 text-primary" />
                       </div>
-                      <div className="flex-1 flex gap-2">
+                      <div className="flex-1 space-y-2">
                         <Textarea
                           placeholder="Add a comment..."
                           value={newComment}
                           onChange={(e) => setNewComment(e.target.value)}
-                          className="min-h-[100px] resize-none"
+                          className="min-h-[80px]"
                         />
-                        <Button onClick={handleAddComment} size="icon" className="self-end h-10 w-10">
-                          <Send className="w-4 h-4" />
-                        </Button>
+                        <div className="flex justify-end">
+                          <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                            <Send className="w-4 h-4 mr-2" />
+                            Post Comment
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -449,37 +516,42 @@ const DocumentDetail = () => {
           <div className="space-y-6">
             {/* Metadata */}
             <div className="bg-card rounded-xl border border-border p-5">
-              <h2 className="font-semibold text-foreground mb-4">Document Metadata</h2>
+              <h3 className="font-semibold text-foreground mb-4">Metadata</h3>
               <div className="space-y-3">
-                <MetadataItem icon={User} label="Author" value={document.author || "Unknown"} />
-                <MetadataItem icon={Folder} label="Collection" value={document.collection} />
-                <MetadataItem icon={Calendar} label="Upload Date" value={format(document.uploadedAt, "MMMM d, yyyy")} />
-                <MetadataItem icon={Clock} label="Upload Time" value={format(document.uploadedAt, "h:mm a")} />
-                <MetadataItem icon={HardDrive} label="File Size" value={document.size} />
-                <MetadataItem icon={Tag} label="File Type" value={config.label} />
+                <MetadataItem icon={User} label="Author" value={author} />
+                {collection && (
+                  <MetadataItem icon={Folder} label="Collection" value={collection.name} />
+                )}
+                {dateIssued && (
+                  <MetadataItem icon={Calendar} label="Date Issued" value={format(new Date(dateIssued), "MMMM d, yyyy")} />
+                )}
+                {bitstreams.length > 0 && (
+                  <MetadataItem 
+                    icon={HardDrive} 
+                    label="Size" 
+                    value={`${(bitstreams.reduce((acc, b) => acc + (b.sizeBytes || 0), 0) / 1024 / 1024).toFixed(2)} MB`} 
+                  />
+                )}
+                {item.handle && (
+                  <MetadataItem icon={Tag} label="Handle" value={item.handle} />
+                )}
               </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* All Metadata Fields */}
             <div className="bg-card rounded-xl border border-border p-5">
-              <h2 className="font-semibold text-foreground mb-4">Quick Actions</h2>
-              <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <Download className="w-4 h-4 mr-2" />
-                  Download Document
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share Document
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <PenTool className="w-4 h-4 mr-2" />
-                  Add Signature
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Metadata
-                </Button>
+              <h3 className="font-semibold text-foreground mb-4">All Fields</h3>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {Object.entries(metadata).map(([key, values]) => (
+                  <div key={key} className="pb-3 border-b border-border last:border-0">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                      {siteConfig.metadataLabels[key] || key}
+                    </p>
+                    {values.map((v, i) => (
+                      <p key={i} className="text-sm text-foreground">{v.value}</p>
+                    ))}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
