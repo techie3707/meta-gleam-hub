@@ -12,7 +12,7 @@ export const siteConfig = {
   apiEndpoint: "http://localhost:8080/server",
   
   // UI Configuration
-  uiUrl: "http://localhost:4000",
+  uiUrl: "http://localhost:8080",
   
   // Pagination
   itemsPerPage: 10,

@@ -25,11 +25,16 @@ export interface WorkspaceItem {
 export interface WorkflowItem {
   id: string;
   type: string;
+  action?: string;
   item?: {
     id: string;
     uuid: string;
     name: string;
     metadata: Record<string, Array<{ value: string }>>;
+  };
+  workflowitem?: {
+    id: string;
+    name?: string;
   };
   submitter?: {
     id: string;

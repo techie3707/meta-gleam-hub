@@ -18,11 +18,10 @@ const Documents = () => {
       query: searchQuery || "*",
       page: 0,
       size: 100,
-      embed: ["thumbnail", "accessStatus"]
     })
   });
 
-  const documents = searchResults?.searchResult?.objects || [];
+  const documents = searchResults?.results || [];
 
   return (
     <AppLayout>
@@ -91,8 +90,7 @@ const Documents = () => {
           </div>
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {documents.map((obj, index) => {
-              const item = obj.indexableObject;
+            {documents.map((item, index) => {
               if (!item) return null;
               
               const doc = {
@@ -100,7 +98,7 @@ const Documents = () => {
                 title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
                 type: 'pdf' as const,
                 collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
-                uploadedAt: item.lastModified ? new Date(item.lastModified) : new Date(),
+                uploadedAt: new Date(),
                 size: 'Unknown',
                 author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
                 description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',
@@ -119,8 +117,7 @@ const Documents = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {documents.map((obj, index) => {
-              const item = obj.indexableObject;
+            {documents.map((item, index) => {
               if (!item) return null;
               
               const doc = {
@@ -128,7 +125,7 @@ const Documents = () => {
                 title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
                 type: 'pdf' as const,
                 collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
-                uploadedAt: item.lastModified ? new Date(item.lastModified) : new Date(),
+                uploadedAt: new Date(),
                 size: 'Unknown',
                 author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
                 description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',

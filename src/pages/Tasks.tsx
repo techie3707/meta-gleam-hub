@@ -52,8 +52,9 @@ const Tasks = () => {
   const allTasks = [...(pooledTasks || []), ...(claimedTasks || [])];
 
   const filteredTasks = allTasks.filter((task) => {
+    const taskName = task.item?.name || task.workflowitem?.name || '';
     const matchesSearch = searchQuery === "" || 
-      task.workflowitem?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+      taskName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
@@ -129,8 +130,9 @@ const Tasks = () => {
             </div>
           ) : (
             filteredTasks.map((task, index) => {
-              const itemName = task.workflowitem?.name || 'Workflow Task';
+              const itemName = task.item?.name || task.workflowitem?.name || 'Workflow Task';
               const action = task.action || 'Review';
+              const taskId = task.item?.id || task.workflowitem?.id;
               
               return (
                 <div
@@ -147,9 +149,9 @@ const Tasks = () => {
                           <p className="text-sm text-muted-foreground line-clamp-2">
                             Workflow step for {itemName}
                           </p>
-                          {task.workflowitem?.id && (
+                          {taskId && (
                             <p className="text-xs text-muted-foreground mt-1">
-                              Item ID: {task.workflowitem.id}
+                              Item ID: {taskId}
                             </p>
                           )}
                         </div>

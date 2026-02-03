@@ -17,11 +17,13 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type SystemStatus = "UP" | "DOWN" | "UNKNOWN" | "OUT_OF_SERVICE";
+
 interface DashboardStats {
   totalItems: number;
   totalCollections: number;
   activeUsers: number;
-  systemStatus: "UP" | "DOWN" | "UNKNOWN";
+  systemStatus: SystemStatus;
   contentIssues: number;
 }
 
@@ -29,7 +31,7 @@ const Index = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [systemHealth, setSystemHealth] = useState<"UP" | "DOWN" | "UNKNOWN">("UNKNOWN");
+  const [systemHealth, setSystemHealth] = useState<SystemStatus>("UNKNOWN");
 
   useEffect(() => {
     loadDashboardData();

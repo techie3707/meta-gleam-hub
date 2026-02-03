@@ -15,6 +15,7 @@ export interface SearchParams {
   dsoType?: "ITEM" | "COLLECTION" | "COMMUNITY";
   configuration?: string;
   filters?: Record<string, string>;
+  embed?: string[];
 }
 
 export interface SearchResult {
@@ -30,8 +31,24 @@ export interface SearchResult {
   };
 }
 
+export interface SearchResultObject {
+  indexableObject?: SearchResult;
+  _embedded?: {
+    indexableObject?: SearchResult;
+  };
+}
+
 export interface SearchResponse {
   results: SearchResult[];
+  searchResult?: {
+    objects: SearchResultObject[];
+    page?: {
+      size: number;
+      totalElements: number;
+      totalPages: number;
+      number: number;
+    };
+  };
   page: {
     size: number;
     totalElements: number;
