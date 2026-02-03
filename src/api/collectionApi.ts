@@ -93,18 +93,22 @@ export const fetchCollectionById = async (id: string): Promise<Collection | null
  */
 export const createCollection = async (
   parentId: string,
-  title: string,
-  description?: string
+  metadata: Record<string, Array<{ value: string; language?: string }>>,
+  name?: string
 ): Promise<Collection | null> => {
   try {
+    const payload: any = {
+      metadata,
+      type: "collection",
+    };
+
+    if (name) {
+      payload.name = name;
+    }
+
     const response = await axiosInstance.post(
       `/api/core/collections?parent=${parentId}`,
-      {
-        metadata: {
-          "dc.title": [{ value: title }],
-          "dc.description": description ? [{ value: description }] : [],
-        },
-      }
+      payload
     );
     
     return {

@@ -38,45 +38,6 @@ import { ScannedBillUpload } from "@/components/billing/ScannedBillUpload";
 import { InvoiceForm } from "@/components/billing/InvoiceForm";
 import { InvoiceCard } from "@/components/billing/InvoiceCard";
 
-const mockInvoices = [
-  {
-    id: "INV-001",
-    vendor: "Tech Solutions Inc.",
-    amount: 2450.00,
-    date: "2024-01-15",
-    dueDate: "2024-02-15",
-    status: "paid",
-    type: "scanned"
-  },
-  {
-    id: "INV-002",
-    vendor: "Office Supplies Co.",
-    amount: 890.50,
-    date: "2024-01-18",
-    dueDate: "2024-02-18",
-    status: "pending",
-    type: "manual"
-  },
-  {
-    id: "INV-003",
-    vendor: "Cloud Services Ltd.",
-    amount: 1200.00,
-    date: "2024-01-20",
-    dueDate: "2024-02-20",
-    status: "overdue",
-    type: "scanned"
-  },
-  {
-    id: "INV-004",
-    vendor: "Marketing Agency",
-    amount: 5600.00,
-    date: "2024-01-22",
-    dueDate: "2024-02-22",
-    status: "draft",
-    type: "manual"
-  }
-];
-
 const Billing = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
@@ -84,19 +45,15 @@ const Billing = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [scannedData, setScannedData] = useState<any>(null);
 
-  const filteredInvoices = mockInvoices.filter(invoice => {
-    const matchesSearch = invoice.vendor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         invoice.id.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === "all" || invoice.status === activeTab;
-    return matchesSearch && matchesTab;
-  });
+  // TODO: Replace with real invoice API when available
+  const filteredInvoices: any[] = [];
 
   const stats = {
-    total: mockInvoices.length,
-    pending: mockInvoices.filter(i => i.status === "pending").length,
-    paid: mockInvoices.filter(i => i.status === "paid").length,
-    overdue: mockInvoices.filter(i => i.status === "overdue").length,
-    totalAmount: mockInvoices.reduce((sum, i) => sum + i.amount, 0)
+    total: 0,
+    pending: 0,
+    paid: 0,
+    overdue: 0,
+    totalAmount: 0
   };
 
   const handleScannedBill = (data: any) => {

@@ -116,6 +116,8 @@ const DocumentDetail = () => {
     try {
       const itemData = await fetchItemWithBitstreams(id);
       if (itemData) {
+        console.log("Item data loaded:", itemData);
+        console.log("Bundles:", itemData.bundles);
         setItem(itemData);
         const col = await fetchOwningCollection(id);
         setCollection(col);
@@ -233,6 +235,19 @@ const DocumentDetail = () => {
   
   const originalBundle = item.bundles?.find((b) => b.name === "ORIGINAL");
   const bitstreams = originalBundle?.bitstreams || [];
+  
+  // Get thumbnail from THUMBNAIL bundle
+  const thumbnailBundle = item.bundles?.find((b) => b.name === "THUMBNAIL");
+  const thumbnailBitstream = thumbnailBundle?.bitstreams?.[0];
+  const thumbnailUrl = thumbnailBitstream 
+    ? `${siteConfig.apiEndpoint}/api/core/bitstreams/${thumbnailBitstream.id}/content`
+    : null;
+  
+  // Debug logging
+  console.log("Original bundle:", originalBundle);
+  console.log("Bitstreams from ORIGINAL:", bitstreams);
+  console.log("Thumbnail bundle:", thumbnailBundle);
+  console.log("Thumbnail URL:", thumbnailUrl);
 
   // Build action history from item data
   const actionHistory = [
@@ -255,7 +270,11 @@ const DocumentDetail = () => {
             </Button>
             {isAdmin && (
               <>
-                <Button variant="outline" size="icon">
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => navigate(`/documents/edit/${id}`)}
+                >
                   <Edit className="w-4 h-4" />
                 </Button>
                 <Button 
@@ -284,9 +303,30 @@ const DocumentDetail = () => {
         {/* Document Header */}
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-start gap-6">
-            <div className={cn("p-5 rounded-xl", config.bgColor)}>
-              <Icon className={cn("w-12 h-12", config.color)} />
-            </div>
+            {thumbnailUrl ? (
+              <div className="w-48 h-48 rounded-xl overflow-hidden border-2 border-border flex-shrink-0">
+                <img 
+                  src={thumbnailUrl} 
+                  alt={`${title} thumbnail`}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to icon if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.parentElement!.innerHTML = `
+                      <div class="w-full h-full flex items-center justify-center ${config.bgColor}">
+                        <div class="${config.color}">
+                          ${Icon.name}
+                        </div>
+                      </div>
+                    `;
+                  }}
+                />
+              </div>
+            ) : (
+              <div className={cn("p-5 rounded-xl", config.bgColor)}>
+                <Icon className={cn("w-12 h-12", config.color)} />
+              </div>
+            )}
             <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
@@ -328,35 +368,48 @@ const DocumentDetail = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-border">
-                  {bitstreams.map((bitstream) => (
-                    <div key={bitstream.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={cn("p-2 rounded-lg", config.bgColor)}>
-                          <Icon className={cn("w-5 h-5", config.color)} />
+                  {bitstreams.map((bitstream) => {
+                    const isPDF = bitstream.name.toLowerCase().endsWith('.pdf');
+                    return (
+                      <div key={bitstream.id} className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("p-2 rounded-lg", config.bgColor)}>
+                            <Icon className={cn("w-5 h-5", config.color)} />
+                          </div>
+                          <div>
+                            <p className="font-medium text-foreground">{bitstream.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {bitstream.sizeBytes ? `${(bitstream.sizeBytes / 1024 / 1024).toFixed(2)} MB` : "Unknown size"}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{bitstream.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {bitstream.sizeBytes ? `${(bitstream.sizeBytes / 1024 / 1024).toFixed(2)} MB` : "Unknown size"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDownload(bitstream)}
-                          disabled={downloading === bitstream.id}
-                        >
-                          {downloading === bitstream.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Download className="w-4 h-4" />
+                        <div className="flex items-center gap-2">
+                          {isPDF && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => navigate(`/pdf/${id}/${bitstream.id}`)}
+                            >
+                              <ExternalLink className="w-4 h-4 mr-2" />
+                              View
+                            </Button>
                           )}
-                        </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownload(bitstream)}
+                            disabled={downloading === bitstream.id}
+                          >
+                            {downloading === bitstream.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -372,13 +425,6 @@ const DocumentDetail = () => {
                     >
                       <History className="w-4 h-4 mr-2" />
                       Action History
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="signatures"
-                      className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-1 pb-4"
-                    >
-                      <PenTool className="w-4 h-4 mr-2" />
-                      Signatures
                     </TabsTrigger>
                     <TabsTrigger
                       value="comments"
@@ -416,53 +462,6 @@ const DocumentDetail = () => {
                         </div>
                       </div>
                     ))}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="signatures" className="p-6 m-0">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-muted-foreground">
-                        {mockSignatures.filter((s) => s.status === "signed").length} of {mockSignatures.length} signatures collected
-                      </p>
-                      <Button>
-                        <PenTool className="w-4 h-4 mr-2" />
-                        Add Signature
-                      </Button>
-                    </div>
-                    <Separator />
-                    <div className="space-y-3">
-                      {mockSignatures.map((signature) => (
-                        <div
-                          key={signature.id}
-                          className="flex items-center justify-between p-4 rounded-lg border border-border bg-muted/30"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <User className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground">{signature.user}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {signature.status === "signed"
-                                  ? `Signed on ${format(signature.signedAt, "MMM d, yyyy 'at' h:mm a")}`
-                                  : "Pending signature"}
-                              </p>
-                            </div>
-                          </div>
-                          <Badge
-                            variant={signature.status === "signed" ? "default" : "secondary"}
-                            className={cn(
-                              signature.status === "signed" && "bg-primary/10 text-primary border-primary/20",
-                              signature.status === "pending" && "bg-accent text-accent-foreground border-accent",
-                              signature.status === "rejected" && "bg-destructive/10 text-destructive border-destructive/20"
-                            )}
-                          >
-                            {signature.status.charAt(0).toUpperCase() + signature.status.slice(1)}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </TabsContent>
 

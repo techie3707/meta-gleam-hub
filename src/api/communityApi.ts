@@ -26,6 +26,16 @@ export interface CommunityListResponse {
 }
 
 /**
+ * Fetch all communities (alias for fetchTopCommunities)
+ */
+export const fetchCommunities = async (
+  page = 0,
+  size = 50
+): Promise<CommunityListResponse> => {
+  return fetchTopCommunities(page, size);
+};
+
+/**
  * Fetch top-level communities
  */
 export const fetchTopCommunities = async (

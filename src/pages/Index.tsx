@@ -1,46 +1,122 @@
-import { FileText, FolderOpen, Users, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { FileText, FolderOpen, Users, TrendingUp, Activity, AlertCircle } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RecentDocuments } from "@/components/dashboard/RecentDocuments";
 import { TasksList } from "@/components/dashboard/TasksList";
 import { CollectionOverview } from "@/components/dashboard/CollectionOverview";
+import { useToast } from "@/hooks/use-toast";
+import {
+  searchRepository,
+  fetchRecentItems,
+} from "@/api/discoveryApi";
+import {
+  getSystemStatus,
+  getCurrentUserInfo,
+} from "@/api/healthApi";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const stats = [
-  {
-    title: "Total Documents",
-    value: "12,847",
-    change: "+124 this week",
-    changeType: "positive" as const,
-    icon: FileText,
-    iconColor: "text-primary",
-  },
-  {
-    title: "Collections",
-    value: "48",
-    change: "+3 this month",
-    changeType: "positive" as const,
-    icon: FolderOpen,
-    iconColor: "text-document-word",
-  },
-  {
-    title: "Active Users",
-    value: "156",
-    change: "23 online now",
-    changeType: "neutral" as const,
-    icon: Users,
-    iconColor: "text-document-excel",
-  },
-  {
-    title: "Storage Used",
-    value: "847 GB",
-    change: "78% of quota",
-    changeType: "neutral" as const,
-    icon: TrendingUp,
-    iconColor: "text-document-image",
-  },
-];
+interface DashboardStats {
+  totalItems: number;
+  totalCollections: number;
+  activeUsers: number;
+  systemStatus: "UP" | "DOWN" | "UNKNOWN";
+  contentIssues: number;
+}
 
 const Index = () => {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [systemHealth, setSystemHealth] = useState<"UP" | "DOWN" | "UNKNOWN">("UNKNOWN");
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Load all dashboard data in parallel
+      const [
+        itemsResponse,
+        healthStatus,
+        userInfo,
+      ] = await Promise.all([
+        searchRepository({ size: 1 }).catch(() => ({ _embedded: { searchResult: { page: { totalElements: 0 } } } })),
+        getSystemStatus().catch(() => ({ overall: "UNKNOWN" as const, components: [] })),
+        getCurrentUserInfo().catch(() => null),
+      ]);
+
+      const totalItems = itemsResponse._embedded?.searchResult?.page?.totalElements || 0;
+
+      // Try to get collections count
+      const collectionsResponse = await searchRepository({ 
+        configuration: "collection",
+        size: 1 
+      }).catch(() => ({ _embedded: { searchResult: { page: { totalElements: 0 } } } }));
+      
+      const totalCollections = collectionsResponse._embedded?.searchResult?.page?.totalElements || 0;
+
+      setStats({
+        totalItems,
+        totalCollections,
+        activeUsers: userInfo?.authenticated ? 1 : 0,
+        systemStatus: healthStatus.overall,
+        contentIssues: 0, // Content quality API not available in this DSpace version
+      });
+
+      setSystemHealth(healthStatus.overall);
+
+    } catch (error) {
+      console.error("Load dashboard data error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const dashboardStats = stats ? [
+    {
+      title: "Total Documents",
+      value: stats.totalItems.toLocaleString(),
+      change: "Repository items",
+      changeType: "neutral" as const,
+      icon: FileText,
+      iconColor: "text-primary",
+    },
+    {
+      title: "Collections",
+      value: stats.totalCollections.toString(),
+      change: "Active collections",
+      changeType: "neutral" as const,
+      icon: FolderOpen,
+      iconColor: "text-document-word",
+    },
+    {
+      title: "System Health",
+      value: stats.systemStatus,
+      change: stats.systemStatus === "UP" ? "All systems operational" : "Issues detected",
+      changeType: stats.systemStatus === "UP" ? "positive" as const : "negative" as const,
+      icon: Activity,
+      iconColor: stats.systemStatus === "UP" ? "text-green-600" : "text-red-600",
+    },
+    {
+      title: "Content Issues",
+      value: stats.contentIssues.toString(),
+      change: "Items needing attention",
+      changeType: stats.contentIssues > 0 ? "negative" as const : "positive" as const,
+      icon: AlertCircle,
+      iconColor: stats.contentIssues > 0 ? "text-yellow-600" : "text-green-600",
+    },
+  ] : [];
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -48,17 +124,33 @@ const Index = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Welcome back! Here's an overview of your document management system.
+            Real-time overview of your DSpace repository
           </p>
         </div>
 
+        {/* System Health Alert */}
+        {systemHealth === "DOWN" && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              System health check failed. Some services may be unavailable.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {stats.map((stat, index) => (
-            <div key={stat.title} style={{ animationDelay: `${index * 100}ms` }}>
-              <StatCard {...stat} />
-            </div>
-          ))}
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))
+          ) : (
+            dashboardStats.map((stat, index) => (
+              <div key={stat.title} style={{ animationDelay: `${index * 100}ms` }}>
+                <StatCard {...stat} />
+              </div>
+            ))
+          )}
         </div>
 
         {/* Main Content Grid */}

@@ -9,7 +9,7 @@ export const siteConfig = {
   description: "Document Management System",
 
   // API Configuration
-  apiEndpoint: "https://demo.dspace.org/server",
+  apiEndpoint: "http://localhost:8080/server",
   
   // UI Configuration
   uiUrl: "http://localhost:4000",
@@ -104,6 +104,8 @@ export const siteConfig = {
       { name: "Billing", href: "/billing", icon: "Receipt" },
     ],
     admin: [
+      { name: "Create Item", href: "/items/create", icon: "FileText" },
+      { name: "Create Collection", href: "/collections/create", icon: "FolderOpen" },
       { name: "Users", href: "/users", icon: "Users" },
       { name: "Groups", href: "/groups", icon: "Users" },
       { name: "Workflow", href: "/workflow", icon: "GitBranch" },

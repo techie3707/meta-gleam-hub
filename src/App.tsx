@@ -19,6 +19,15 @@ import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
+import UserManagement from "./pages/UserManagement";
+import GroupManagement from "./pages/GroupManagement";
+import WorkflowManagement from "./pages/WorkflowManagement";
+import ProcessMonitoring from "./pages/ProcessMonitoring";
+import MetadataRegistry from "./pages/MetadataRegistry";
+import CreateItem from "./pages/CreateItem";
+import EditItem from "./pages/EditItem";
+import CreateCollection from "./pages/CreateCollection";
+import PDFViewerPage from "./pages/PDFViewerPage";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +93,38 @@ const App = () => (
               }
             />
             <Route
+              path="/documents/edit/:id"
+              element={
+                <ProtectedRoute>
+                  <EditItem />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pdf/:id/:bitstreamId"
+              element={
+                <ProtectedRoute>
+                  <PDFViewerPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/items/create"
+              element={
+                <ProtectedRoute>
+                  <CreateItem />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/collections/create"
+              element={
+                <ProtectedRoute adminOnly>
+                  <CreateCollection />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/tasks"
               element={
                 <ProtectedRoute>
@@ -96,6 +137,46 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Billing />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute adminOnly>
+                  <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/groups"
+              element={
+                <ProtectedRoute adminOnly>
+                  <GroupManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflow"
+              element={
+                <ProtectedRoute adminOnly>
+                  <WorkflowManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/processes"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ProcessMonitoring />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/metadata"
+              element={
+                <ProtectedRoute adminOnly>
+                  <MetadataRegistry />
                 </ProtectedRoute>
               }
             />

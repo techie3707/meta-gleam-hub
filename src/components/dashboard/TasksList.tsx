@@ -1,112 +1,96 @@
+import { useEffect, useState } from "react";
 import { CheckCircle2, Circle, Clock, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { fetchWorkflowItems } from "@/api/workflowApi";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Task {
   id: string;
   title: string;
   description: string;
-  status: "pending" | "in-progress" | "completed" | "overdue";
-  priority: "low" | "medium" | "high";
-  dueDate: string;
-  assignee: string;
+  status: "pending" | "in-progress";
+  submitter: string;
 }
-
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Review Q4 Financial Report",
-    description: "Check figures and approve for publishing",
-    status: "pending",
-    priority: "high",
-    dueDate: "Today",
-    assignee: "John Doe",
-  },
-  {
-    id: "2",
-    title: "Categorize new uploads",
-    description: "15 documents awaiting categorization",
-    status: "in-progress",
-    priority: "medium",
-    dueDate: "Tomorrow",
-    assignee: "Jane Smith",
-  },
-  {
-    id: "3",
-    title: "Update metadata for Legal docs",
-    description: "Add missing author and date fields",
-    status: "overdue",
-    priority: "high",
-    dueDate: "Yesterday",
-    assignee: "Mike Johnson",
-  },
-  {
-    id: "4",
-    title: "Archive 2023 project files",
-    description: "Move completed project docs to archive",
-    status: "pending",
-    priority: "low",
-    dueDate: "Next week",
-    assignee: "Sarah Wilson",
-  },
-];
 
 const statusConfig = {
   pending: { icon: Circle, color: "text-muted-foreground" },
   "in-progress": { icon: Clock, color: "text-warning" },
-  completed: { icon: CheckCircle2, color: "text-success" },
-  overdue: { icon: AlertCircle, color: "text-destructive" },
-};
-
-const priorityConfig = {
-  low: { color: "bg-muted text-muted-foreground" },
-  medium: { color: "bg-warning/10 text-warning" },
-  high: { color: "bg-destructive/10 text-destructive" },
 };
 
 export function TasksList() {
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+      const response = await fetchWorkflowItems(0, 4);
+      
+      const tasksData = response.items.map((item) => ({
+        id: item.id,
+        title: item.item?.name || "Untitled",
+        description: `Submitted by ${item.submitter?.email || "Unknown"}`,
+        status: "pending" as const,
+        submitter: item.submitter?.email || "Unknown",
+      }));
+      
+      setTasks(tasksData);
+    } catch (error) {
+      console.error("Load tasks error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-card rounded-xl border border-border overflow-hidden animate-slide-up">
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
-        <h3 className="font-semibold text-foreground">Active Tasks</h3>
+        <h3 className="font-semibold text-foreground">Workflow Tasks</h3>
         <Badge variant="secondary" className="text-xs">
-          {mockTasks.filter((t) => t.status !== "completed").length} pending
+          {tasks.length} pending
         </Badge>
       </div>
       <div className="divide-y divide-border">
-        {mockTasks.map((task, index) => {
-          const StatusIcon = statusConfig[task.status].icon;
-          return (
-            <div
-              key={task.id}
-              className="task-item mx-3 my-2 border-0"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <StatusIcon
-                className={cn("w-5 h-5 flex-shrink-0", statusConfig[task.status].color)}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-foreground truncate">{task.title}</p>
-                  <Badge className={cn("text-xs", priorityConfig[task.priority].color)}>
-                    {task.priority}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
-              </div>
-              <div className="text-right text-xs">
-                <p
-                  className={cn(
-                    task.status === "overdue" ? "text-destructive font-medium" : "text-muted-foreground"
-                  )}
-                >
-                  {task.dueDate}
-                </p>
-                <p className="text-muted-foreground">{task.assignee}</p>
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="px-5 py-3.5 flex items-center gap-3">
+              <Skeleton className="w-5 h-5 rounded-full" />
+              <div className="flex-1">
+                <Skeleton className="h-4 w-3/4 mb-2" />
+                <Skeleton className="h-3 w-1/2" />
               </div>
             </div>
-          );
-        })}
+          ))
+        ) : tasks.length > 0 ? (
+          tasks.map((task, index) => {
+            const StatusIcon = statusConfig[task.status].icon;
+            return (
+              <div
+                key={task.id}
+                className="px-5 py-3.5 flex items-center gap-3 hover:bg-muted/50 transition-colors cursor-pointer"
+                style={{ animationDelay: `${index * 50}ms` }}
+                onClick={() => window.location.href = `/workflow`}
+              >
+                <StatusIcon
+                  className={cn("w-5 h-5 flex-shrink-0", statusConfig[task.status].color)}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">{task.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="px-5 py-8 text-center text-muted-foreground text-sm">
+            No pending workflow tasks
+          </div>
+        )}
       </div>
     </div>
   );

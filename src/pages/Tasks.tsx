@@ -8,6 +8,7 @@ import {
   Filter,
   Calendar,
   User,
+  Loader2,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -15,85 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: "pending" | "in-progress" | "completed" | "overdue";
-  priority: "low" | "medium" | "high";
-  dueDate: string;
-  assignee: string;
-  documentRef?: string;
-  category: string;
-}
-
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Review Q4 Financial Report",
-    description: "Check figures and approve for publishing to stakeholders",
-    status: "pending",
-    priority: "high",
-    dueDate: "Today, 5:00 PM",
-    assignee: "John Doe",
-    documentRef: "Annual Report 2024.pdf",
-    category: "Review",
-  },
-  {
-    id: "2",
-    title: "Categorize new document uploads",
-    description: "15 documents awaiting proper categorization and metadata",
-    status: "in-progress",
-    priority: "medium",
-    dueDate: "Tomorrow, 12:00 PM",
-    assignee: "Jane Smith",
-    category: "Organization",
-  },
-  {
-    id: "3",
-    title: "Update Legal contract metadata",
-    description: "Add missing author and expiration date fields",
-    status: "overdue",
-    priority: "high",
-    dueDate: "Yesterday",
-    assignee: "Mike Johnson",
-    documentRef: "Service Agreement v2.pdf",
-    category: "Metadata",
-  },
-  {
-    id: "4",
-    title: "Archive 2023 project files",
-    description: "Move completed project documentation to archive collection",
-    status: "pending",
-    priority: "low",
-    dueDate: "Dec 20, 2024",
-    assignee: "Sarah Wilson",
-    category: "Archival",
-  },
-  {
-    id: "5",
-    title: "Approve HR policy updates",
-    description: "Review and approve updated employee handbook sections",
-    status: "pending",
-    priority: "medium",
-    dueDate: "Dec 18, 2024",
-    assignee: "Emily Chen",
-    documentRef: "Employee Handbook 2024.pdf",
-    category: "Approval",
-  },
-  {
-    id: "6",
-    title: "Verify technical documentation",
-    description: "Cross-check API documentation with latest implementation",
-    status: "completed",
-    priority: "medium",
-    dueDate: "Dec 10, 2024",
-    assignee: "Dev Team",
-    documentRef: "API Docs v2.0",
-    category: "Review",
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { fetchPooledTasks, fetchClaimedTasks } from "@/api/workflowApi";
 
 const statusConfig = {
   pending: { icon: Circle, color: "text-muted-foreground", bgColor: "bg-muted/50" },
@@ -114,21 +38,31 @@ const Tasks = () => {
   const [activeFilter, setActiveFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredTasks = mockTasks.filter((task) => {
-    const matchesFilter =
-      activeFilter === "All" ||
-      (activeFilter === "In Progress" && task.status === "in-progress") ||
-      task.status === activeFilter.toLowerCase();
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
+  const { data: pooledTasks, isLoading: isLoadingPooled } = useQuery({
+    queryKey: ["pooled-tasks"],
+    queryFn: () => fetchPooledTasks()
+  });
+
+  const { data: claimedTasks, isLoading: isLoadingClaimed } = useQuery({
+    queryKey: ["claimed-tasks"],
+    queryFn: () => fetchClaimedTasks()
+  });
+
+  const isLoading = isLoadingPooled || isLoadingClaimed;
+  const allTasks = [...(pooledTasks || []), ...(claimedTasks || [])];
+
+  const filteredTasks = allTasks.filter((task) => {
+    const matchesSearch = searchQuery === "" || 
+      task.workflowitem?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
   });
 
   const taskCounts = {
-    all: mockTasks.length,
-    pending: mockTasks.filter((t) => t.status === "pending").length,
-    inProgress: mockTasks.filter((t) => t.status === "in-progress").length,
-    completed: mockTasks.filter((t) => t.status === "completed").length,
-    overdue: mockTasks.filter((t) => t.status === "overdue").length,
+    all: allTasks.length,
+    pending: pooledTasks?.length || 0,
+    inProgress: claimedTasks?.length || 0,
+    completed: 0,
+    overdue: 0,
   };
 
   return (
@@ -185,89 +119,58 @@ const Tasks = () => {
 
         {/* Task List */}
         <div className="space-y-3">
-          {filteredTasks.map((task, index) => {
-            const StatusIcon = statusConfig[task.status].icon;
-            return (
-              <div
-                key={task.id}
-                className="bg-card rounded-xl border border-border p-5 hover:border-primary/30 transition-all duration-200 animate-slide-up"
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="flex items-start gap-4">
-                  <Checkbox
-                    checked={task.status === "completed"}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3
-                            className={cn(
-                              "font-semibold",
-                              task.status === "completed"
-                                ? "text-muted-foreground line-through"
-                                : "text-foreground"
-                            )}
-                          >
-                            {task.title}
-                          </h3>
-                          <Badge className={priorityConfig[task.priority].color}>
-                            {priorityConfig[task.priority].label}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {task.category}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : filteredTasks.length === 0 ? (
+            <div className="text-center py-12 bg-card rounded-xl border border-border">
+              <p className="text-muted-foreground">No workflow tasks found</p>
+            </div>
+          ) : (
+            filteredTasks.map((task, index) => {
+              const itemName = task.workflowitem?.name || 'Workflow Task';
+              const action = task.action || 'Review';
+              
+              return (
+                <div
+                  key={task.id}
+                  className="bg-card rounded-xl border border-border p-5 hover:border-primary/30 transition-all duration-200 animate-slide-up"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className="flex items-start gap-4">
+                    <Checkbox className="mt-1" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground mb-1">{action}: {itemName}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            Workflow step for {itemName}
+                          </p>
+                          {task.workflowitem?.id && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Item ID: {task.workflowitem.id}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                            Pending
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {task.description}
-                        </p>
-                        {task.documentRef && (
-                          <p className="text-xs text-primary mt-2 hover:underline cursor-pointer">
-                            📎 {task.documentRef}
-                          </p>
-                        )}
                       </div>
-                      <div
-                        className={cn(
-                          "px-2.5 py-1 rounded-full flex items-center gap-1.5",
-                          statusConfig[task.status].bgColor
-                        )}
-                      >
-                        <StatusIcon
-                          className={cn("w-4 h-4", statusConfig[task.status].color)}
-                        />
-                        <span
-                          className={cn(
-                            "text-xs font-medium capitalize",
-                            statusConfig[task.status].color
-                          )}
-                        >
-                          {task.status.replace("-", " ")}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span
-                          className={cn(
-                            task.status === "overdue" && "text-destructive font-medium"
-                          )}
-                        >
-                          {task.dueDate}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5" />
-                        <span>{task.assignee}</span>
+                      <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <User className="w-3.5 h-3.5" />
+                          <span>Workflow System</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </AppLayout>

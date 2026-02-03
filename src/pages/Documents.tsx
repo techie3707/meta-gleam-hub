@@ -1,101 +1,28 @@
 import { useState } from "react";
-import { Grid, List, Filter, SortAsc } from "lucide-react";
+import { Grid, List, Filter, SortAsc, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DocumentCard } from "@/components/documents/DocumentCard";
 import { cn } from "@/lib/utils";
-
-const mockDocuments = [
-  {
-    id: "1",
-    title: "Annual Financial Report 2024",
-    type: "pdf" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 0, 15),
-    size: "2.4 MB",
-    author: "John Smith",
-    description: "Comprehensive annual financial report",
-  },
-  {
-    id: "2",
-    title: "Project Alpha - Technical Specs",
-    type: "doc" as const,
-    collection: "Technical Docs",
-    uploadedAt: new Date(2024, 1, 20),
-    size: "1.8 MB",
-    author: "Sarah Johnson",
-    description: "Technical specifications for Project Alpha",
-  },
-  {
-    id: "3",
-    title: "Q3 Budget Analysis",
-    type: "xls" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 2, 10),
-    size: "956 KB",
-    author: "Mike Davis",
-    description: "Detailed Q3 budget analysis",
-  },
-  {
-    id: "4",
-    title: "Marketing Campaign Assets",
-    type: "image" as const,
-    collection: "Media Library",
-    uploadedAt: new Date(2024, 3, 5),
-    size: "15.2 MB",
-    author: "Emily Chen",
-    description: "Marketing campaign visual assets",
-  },
-  {
-    id: "5",
-    title: "Employee Handbook 2024",
-    type: "pdf" as const,
-    collection: "HR Documents",
-    uploadedAt: new Date(2024, 0, 1),
-    size: "3.2 MB",
-    author: "HR Department",
-    description: "Updated employee handbook",
-  },
-  {
-    id: "6",
-    title: "API Documentation v2.0",
-    type: "doc" as const,
-    collection: "Technical Docs",
-    uploadedAt: new Date(2024, 4, 12),
-    size: "2.1 MB",
-    author: "Dev Team",
-    description: "Complete API documentation",
-  },
-  {
-    id: "7",
-    title: "Sales Report Q1 2024",
-    type: "xls" as const,
-    collection: "Financial Reports",
-    uploadedAt: new Date(2024, 3, 1),
-    size: "1.4 MB",
-    author: "Sales Team",
-    description: "Q1 sales performance report",
-  },
-  {
-    id: "8",
-    title: "Brand Guidelines",
-    type: "pdf" as const,
-    collection: "Media Library",
-    uploadedAt: new Date(2024, 2, 15),
-    size: "8.5 MB",
-    author: "Design Team",
-    description: "Company brand guidelines",
-  },
-];
+import { useQuery } from "@tanstack/react-query";
+import { searchObjects } from "@/api/searchApi";
 
 const Documents = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredDocuments = mockDocuments.filter((doc) =>
-    doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const { data: searchResults, isLoading } = useQuery({
+    queryKey: ["documents", searchQuery],
+    queryFn: () => searchObjects({
+      query: searchQuery || "*",
+      page: 0,
+      size: 100,
+      embed: ["thumbnail", "accessStatus"]
+    })
+  });
+
+  const documents = searchResults?.searchResult?.objects || [];
 
   return (
     <AppLayout>
@@ -154,29 +81,69 @@ const Documents = () => {
         </div>
 
         {/* Documents */}
-        {viewMode === "grid" ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        ) : documents.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No documents found</p>
+          </div>
+        ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filteredDocuments.map((doc, index) => (
-              <div
-                key={doc.id}
-                style={{ animationDelay: `${index * 50}ms` }}
-                className="animate-slide-up"
-              >
-                <DocumentCard document={doc} variant="grid" />
-              </div>
-            ))}
+            {documents.map((obj, index) => {
+              const item = obj.indexableObject;
+              if (!item) return null;
+              
+              const doc = {
+                id: item.id,
+                title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
+                type: 'pdf' as const,
+                collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
+                uploadedAt: item.lastModified ? new Date(item.lastModified) : new Date(),
+                size: 'Unknown',
+                author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
+                description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',
+              };
+              
+              return (
+                <div
+                  key={doc.id}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="animate-slide-up"
+                >
+                  <DocumentCard document={doc} variant="grid" />
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredDocuments.map((doc, index) => (
-              <div
-                key={doc.id}
-                style={{ animationDelay: `${index * 50}ms` }}
-                className="animate-slide-up"
-              >
-                <DocumentCard document={doc} variant="list" />
-              </div>
-            ))}
+            {documents.map((obj, index) => {
+              const item = obj.indexableObject;
+              if (!item) return null;
+              
+              const doc = {
+                id: item.id,
+                title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
+                type: 'pdf' as const,
+                collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
+                uploadedAt: item.lastModified ? new Date(item.lastModified) : new Date(),
+                size: 'Unknown',
+                author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
+                description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',
+              };
+              
+              return (
+                <div
+                  key={doc.id}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                  className="animate-slide-up"
+                >
+                  <DocumentCard document={doc} variant="list" />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

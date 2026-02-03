@@ -295,3 +295,48 @@ export const getWorkspaceItemWithItem = async (
     return null;
   }
 };
+
+/**
+ * Fetch pooled workflow tasks (tasks available for claiming)
+ */
+export const fetchPooledTasks = async (): Promise<WorkflowItem[]> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/workflow/pooleditems?embed=workflowitem,workflowitem.item,workflowitem.submitter`
+    );
+    
+    const items = response.data._embedded?.pooleditems || [];
+    return items.map((pooled: any) => ({
+      id: pooled.id,
+      type: pooled.type,
+      item: pooled._embedded?.workflowitem?._embedded?.item,
+      submitter: pooled._embedded?.workflowitem?._embedded?.submitter,
+    }));
+  } catch (error) {
+    console.error("Fetch pooled tasks error:", error);
+    return [];
+  }
+};
+
+/**
+ * Fetch claimed workflow tasks (tasks assigned to current user)
+ */
+export const fetchClaimedTasks = async (): Promise<WorkflowItem[]> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/workflow/claimedtasks?embed=workflowitem,workflowitem.item,workflowitem.submitter`
+    );
+    
+    const items = response.data._embedded?.claimedtasks || [];
+    return items.map((claimed: any) => ({
+      id: claimed.id,
+      type: claimed.type,
+      item: claimed._embedded?.workflowitem?._embedded?.item,
+      submitter: claimed._embedded?.workflowitem?._embedded?.submitter,
+    }));
+  } catch (error) {
+    console.error("Fetch claimed tasks error:", error);
+    return [];
+  }
+};
+
