@@ -104,9 +104,11 @@ const Search = () => {
   };
 
   const handleFilterChange = (facetName: string, value: string) => {
+    // Use "contains" for text filters (title, author), "equals" for facet values
+    const operator = ["title", "author"].includes(facetName) ? "contains" : "equals";
     setSelectedFilters((prev) => ({
       ...prev,
-      [facetName]: `${value},equals`,
+      [facetName]: `${value},${operator}`,
     }));
     setPage(0);
   };
@@ -217,7 +219,43 @@ const Search = () => {
 
           {/* Advanced Filters Panel */}
           {showFilters && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border animate-fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-6 border-t border-border animate-fade-in">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Title Filter
+                </label>
+                <Input
+                  placeholder="Filter by title..."
+                  value={selectedFilters["title"]?.replace(",contains", "") || ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleFilterChange("title", e.target.value);
+                    } else {
+                      clearFilter("title");
+                    }
+                  }}
+                  className="bg-secondary/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Author Filter
+                </label>
+                <Input
+                  placeholder="Filter by author..."
+                  value={selectedFilters["author"]?.replace(",contains", "") || ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleFilterChange("author", e.target.value);
+                    } else {
+                      clearFilter("author");
+                    }
+                  }}
+                  className="bg-secondary/50"
+                />
+              </div>
+
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">
                   Collection
@@ -259,6 +297,42 @@ const Search = () => {
 
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">
+                  Date From
+                </label>
+                <Input
+                  type="date"
+                  value={selectedFilters["dateFrom"] || ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSelectedFilters(prev => ({ ...prev, dateFrom: e.target.value }));
+                    } else {
+                      clearFilter("dateFrom");
+                    }
+                  }}
+                  className="bg-secondary/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
+                  Date To
+                </label>
+                <Input
+                  type="date"
+                  value={selectedFilters["dateTo"] || ""}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSelectedFilters(prev => ({ ...prev, dateTo: e.target.value }));
+                    } else {
+                      clearFilter("dateTo");
+                    }
+                  }}
+                  className="bg-secondary/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">
                   Items per page
                 </label>
                 <Select value={String(size)} onValueChange={(val) => { setSize(parseInt(val)); setPage(0); }}>
@@ -273,6 +347,21 @@ const Search = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex items-end">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setSelectedFilters({});
+                    setScope("");
+                    setSort(siteConfig.defaultSort);
+                    setPage(0);
+                  }}
+                >
+                  Clear Filters
+                </Button>
               </div>
             </div>
           )}

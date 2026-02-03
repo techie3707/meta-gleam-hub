@@ -137,7 +137,9 @@ const Login = () => {
                   Signing in...
                 </>
               ) : (
-                "Sign in"
+                <>
+                  Login →
+                </>
               )}
             </Button>
           </form>

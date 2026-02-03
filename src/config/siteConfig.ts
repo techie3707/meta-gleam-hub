@@ -9,10 +9,11 @@ export const siteConfig = {
   description: "Document Management System",
 
   // API Configuration
+  // Change this to your DSpace server URL (e.g., "http://your-server:8080/server")
   apiEndpoint: "http://localhost:8080/server",
   
-  // UI Configuration
-  uiUrl: "http://localhost:8080",
+  // UI Configuration  
+  uiUrl: "http://localhost:4000",
   
   // Pagination
   itemsPerPage: 10,
