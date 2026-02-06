@@ -73,6 +73,10 @@ export interface FacetCategory {
 
 /**
  * Search items, collections, or communities
+ * Per API docs: GET /api/discover/search/objects
+ * 
+ * Filter format for date range:
+ * f.dateIssued=[2024-01-01 TO 2024-12-31],equals
  */
 export const searchObjects = async (params: SearchParams): Promise<SearchResponse> => {
   try {
@@ -100,8 +104,22 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
     // Add filters
     if (params.filters) {
       Object.entries(params.filters).forEach(([key, value]) => {
+        // Skip internal date range keys - handle specially
+        if (key === "dateFrom" || key === "dateTo") {
+          return;
+        }
         queryParams.append(`f.${key}`, value);
       });
+
+      // Handle date range filter per API docs
+      // Format: f.dateIssued=[2024-01-01 TO 2024-12-31],equals
+      const dateFrom = params.filters.dateFrom;
+      const dateTo = params.filters.dateTo;
+      if (dateFrom || dateTo) {
+        const from = dateFrom || "*";
+        const to = dateTo || "*";
+        queryParams.append(`f.dateIssued`, `[${from} TO ${to}],equals`);
+      }
     }
 
     const response = await axiosInstance.get(`/api/discover/search/objects?${queryParams.toString()}`);
