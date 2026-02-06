@@ -41,4 +41,25 @@ export * from "./contentReportApi";
 export * from "./healthApi";
 export * from "./discoveryApi";
 
+// Export new APIs per documentation (avoiding duplicates)
+export * from "./cartApi";
+export * from "./resourcePolicyApi";
+export {
+  startBatchImport,
+  getProcessStatus as getBatchProcessStatus,
+  getProcessOutput,
+  listProcesses as listBatchProcesses,
+  type BatchImportProcess,
+  type ProcessDetails,
+  type ProcessFile,
+} from "./batchImportApi";
+export {
+  getWorkspaceItem,
+  getMyWorkspaceItems,
+  uploadToWorkspaceItem,
+  grantLicense,
+  fetchSubmissionFormConfig,
+  type SubmissionFormConfig,
+} from "./workspaceItemApi";
+
 export { default as axiosInstance } from "./axiosInstance";
