@@ -119,7 +119,7 @@ export const deleteMetadataSchema = async (id: number): Promise<boolean> => {
 };
 
 /**
- * Fetch metadata fields
+ * Fetch metadata fields by field name search
  */
 export const fetchMetadataFields = async (
   schemaName: string = "dc",
@@ -153,6 +153,44 @@ export const fetchMetadataFields = async (
     };
   } catch (error) {
     console.error("Fetch metadata fields error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Fetch metadata fields by schema (for Add Metadata dropdown in Edit Item)
+ */
+export const fetchMetadataFieldsBySchema = async (
+  schema: string = "dc",
+  page: number = 0,
+  size: number = 50
+): Promise<MetadataFieldListResponse> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/core/metadatafields/search/bySchema?schema=${schema}&page=${page}&size=${size}`
+    );
+
+    const fields = response.data._embedded?.metadatafields || [];
+    const pageData = response.data.page || {
+      size,
+      totalElements: fields.length,
+      totalPages: 1,
+      number: page,
+    };
+
+    return {
+      fields: fields.map((f: any) => ({
+        id: f.id,
+        element: f.element,
+        qualifier: f.qualifier,
+        scopeNote: f.scopeNote,
+        schema: f._embedded?.schema,
+        _embedded: f._embedded,
+      })),
+      page: pageData,
+    };
+  } catch (error) {
+    console.error("Fetch metadata fields by schema error:", error);
     throw error;
   }
 };

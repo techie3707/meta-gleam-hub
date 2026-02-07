@@ -18,6 +18,7 @@ import {
   ChevronDown,
   Activity,
   Database,
+  FolderTree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
   Activity,
   Database,
+  FolderTree,
 };
 
 export function AppSidebar() {

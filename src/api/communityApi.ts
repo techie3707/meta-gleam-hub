@@ -36,7 +36,7 @@ export const fetchCommunities = async (
 };
 
 /**
- * Fetch top-level communities
+ * Fetch top-level communities via search/top endpoint
  */
 export const fetchTopCommunities = async (
   page = 0,
@@ -44,16 +44,16 @@ export const fetchTopCommunities = async (
 ): Promise<CommunityListResponse> => {
   try {
     const response = await axiosInstance.get(
-      `/api/core/communities?page=${page}&size=${size}`
+      `/api/core/communities/search/top?page=${page}&size=${size}`
     );
     
     const communities = response.data._embedded?.communities || [];
     
     return {
       communities: communities.map((com: any) => ({
-        id: com.id,
+        id: com.id || com.uuid,
         uuid: com.uuid || com.id,
-        name: com.name,
+        name: com.name || com.metadata?.["dc.title"]?.[0]?.value || "Untitled",
         handle: com.handle,
         metadata: com.metadata || {},
         type: com.type,
@@ -67,7 +67,7 @@ export const fetchTopCommunities = async (
       },
     };
   } catch (error) {
-    console.error("Fetch communities error:", error);
+    console.error("Fetch top communities error:", error);
     return {
       communities: [],
       page: { size, totalElements: 0, totalPages: 0, number: 0 },

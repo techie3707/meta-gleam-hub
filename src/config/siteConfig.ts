@@ -107,6 +107,7 @@ export const siteConfig = {
     admin: [
       { name: "Create Item", href: "/items/create", icon: "FileText" },
       { name: "Create Collection", href: "/collections/create", icon: "FolderOpen" },
+      { name: "Edit Community", href: "/communities/edit", icon: "FolderTree" },
       { name: "Users", href: "/users", icon: "Users" },
       { name: "Groups", href: "/groups", icon: "Users" },
       { name: "Workflow", href: "/workflow", icon: "GitBranch" },

@@ -27,6 +27,7 @@ import ProcessMonitoring from "./pages/ProcessMonitoring";
 import MetadataRegistry from "./pages/MetadataRegistry";
 import CreateItem from "./pages/CreateItem";
 import EditItem from "./pages/EditItem";
+import EditCommunity from "./pages/EditCommunity";
 import CreateCollection from "./pages/CreateCollection";
 import PDFViewerPage from "./pages/PDFViewerPage";
 
@@ -122,6 +123,14 @@ const App = () => (
               element={
                 <ProtectedRoute adminOnly>
                   <CreateCollection />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/communities/edit"
+              element={
+                <ProtectedRoute adminOnly>
+                  <EditCommunity />
                 </ProtectedRoute>
               }
             />
