@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSidebarContext } from "./AppLayout";
 import { siteConfig } from "@/config/siteConfig";
 import { fetchCollections, groupCollectionsByCategory, Collection } from "@/api/collectionApi";
 import {
@@ -46,7 +47,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { collapsed, setCollapsed } = useSidebarContext();
   const [collections, setCollections] = useState<Collection[]>([]);
   const [categoryGroups, setCategoryGroups] = useState<Map<string, Collection[]>>(new Map());
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -99,7 +100,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out h-screen",
+        "flex flex-col bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out fixed left-0 top-0 h-screen z-40",
         collapsed ? "w-16" : "w-64"
       )}
     >

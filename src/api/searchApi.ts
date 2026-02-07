@@ -140,6 +140,19 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
       };
     });
 
+    // Extract facets from response
+    const facetsData = response.data._embedded?.facets || [];
+    const facets: FacetCategory[] = facetsData.map((facet: any) => ({
+      name: facet.name,
+      facetType: facet.facetType,
+      values: (facet._embedded?.values || []).map((v: any) => ({
+        label: v.label,
+        count: v.count,
+        value: v._links?.search?.href,
+      })),
+      hasMore: facet._embedded?.values?.length >= (facet.facetLimit || 5),
+    }));
+
     return {
       results,
       page: searchResult?.page || {
@@ -148,9 +161,18 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
         totalPages: 0,
         number: 0,
       },
+      facets,
     };
   } catch (error) {
     console.error("Search error:", error);
+    const errorStatus = (error as any)?.response?.status || 500;
+    if (errorStatus === 400) window.location.href = `/error-400`;
+    else if (errorStatus === 401) window.location.href = `/error-401`;
+    else if (errorStatus === 403) window.location.href = `/error-403`;
+    else if (errorStatus === 422) window.location.href = `/error-422`;
+    else if (errorStatus === 500) window.location.href = `/error-500`;
+    else if (errorStatus !== 0) window.location.href = `/error-404`;
+    
     return {
       results: [],
       page: { size: 10, totalElements: 0, totalPages: 0, number: 0 },
@@ -234,5 +256,27 @@ export const fetchAllFacets = async (params: SearchParams): Promise<FacetCategor
   } catch (error) {
     console.error("Fetch all facets error:", error);
     return [];
+  }
+};
+
+/**
+ * Fetch counts for items with/without files in ORIGINAL bundle
+ */
+export const fetchHasFileCounts = async (
+  params: SearchParams
+): Promise<{ hasFileCount: number; noFileCount: number }> => {
+  try {
+    const facet = await fetchFacetValues('has_content_in_original_bundle', {
+      ...params,
+      facetSize: 10
+    });
+    
+    const hasFileCount = facet.values.find(v => v.label === 'true')?.count || 0;
+    const noFileCount = facet.values.find(v => v.label === 'false')?.count || 0;
+    
+    return { hasFileCount, noFileCount };
+  } catch (error) {
+    console.error("Fetch has file counts error:", error);
+    return { hasFileCount: 0, noFileCount: 0 };
   }
 };

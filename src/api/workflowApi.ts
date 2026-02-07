@@ -26,6 +26,10 @@ export interface WorkflowItem {
   id: string;
   type: string;
   action?: string;
+  owner?: {
+    id: string;
+    email: string;
+  };
   item?: {
     id: string;
     uuid: string;
@@ -303,22 +307,29 @@ export const getWorkspaceItemWithItem = async (
 
 /**
  * Fetch pooled workflow tasks (tasks available for claiming)
+ * Note: DSpace 7+ may not have a direct pooleditems endpoint
+ * Alternative: Use workflowitems with filters
  */
 export const fetchPooledTasks = async (): Promise<WorkflowItem[]> => {
   try {
+    // Try the standard workflowitems endpoint first
     const response = await axiosInstance.get(
-      `/api/workflow/pooleditems?embed=workflowitem,workflowitem.item,workflowitem.submitter`
+      `/api/workflow/workflowitems`
     );
     
-    const items = response.data._embedded?.pooleditems || [];
-    return items.map((pooled: any) => ({
-      id: pooled.id,
-      type: pooled.type,
-      item: pooled._embedded?.workflowitem?._embedded?.item,
-      submitter: pooled._embedded?.workflowitem?._embedded?.submitter,
-    }));
+    const items = response.data._embedded?.workflowitems || [];
+    // Filter for unclaimed items (pooled)
+    return items
+      .filter((item: any) => !item.owner)
+      .map((item: any) => ({
+        id: item.id,
+        type: item.type,
+        item: item._embedded?.item,
+        submitter: item._embedded?.submitter,
+      }));
   } catch (error) {
     console.error("Fetch pooled tasks error:", error);
+    // Return empty array on error to prevent breaking the UI
     return [];
   }
 };
@@ -328,17 +339,22 @@ export const fetchPooledTasks = async (): Promise<WorkflowItem[]> => {
  */
 export const fetchClaimedTasks = async (): Promise<WorkflowItem[]> => {
   try {
+    // Try the standard workflowitems endpoint
     const response = await axiosInstance.get(
-      `/api/workflow/claimedtasks?embed=workflowitem,workflowitem.item,workflowitem.submitter`
+      `/api/workflow/workflowitems`
     );
     
-    const items = response.data._embedded?.claimedtasks || [];
-    return items.map((claimed: any) => ({
-      id: claimed.id,
-      type: claimed.type,
-      item: claimed._embedded?.workflowitem?._embedded?.item,
-      submitter: claimed._embedded?.workflowitem?._embedded?.submitter,
-    }));
+    const items = response.data._embedded?.workflowitems || [];
+    // Filter for claimed items (has owner)
+    return items
+      .filter((item: any) => item.owner)
+      .map((item: any) => ({
+        id: item.id,
+        type: item.type,
+        item: item._embedded?.item,
+        submitter: item._embedded?.submitter,
+        owner: item.owner,
+      }));
   } catch (error) {
     console.error("Fetch claimed tasks error:", error);
     return [];

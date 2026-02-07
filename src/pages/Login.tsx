@@ -154,11 +154,6 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Demo credentials hint */}
-        <div className="text-center text-xs text-muted-foreground">
-          <p>Demo credentials for testing:</p>
-          <p className="font-mono">admin@example.com / password123</p>
-        </div>
       </div>
     </div>
   );

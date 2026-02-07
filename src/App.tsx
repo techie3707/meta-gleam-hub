@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 // Pages
 import Index from "./pages/Index";
 import Search from "./pages/Search";
+import SearchAdvanced from "./pages/SearchAdvanced";
 import Import from "./pages/Import";
 import Collections from "./pages/Collections";
 import Documents from "./pages/Documents";
@@ -56,7 +57,7 @@ const App = () => (
               path="/search"
               element={
                 <ProtectedRoute>
-                  <Search />
+                  <SearchAdvanced />
                 </ProtectedRoute>
               }
             />
