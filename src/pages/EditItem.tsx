@@ -1,10 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -12,23 +27,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, X, FileText, Plus, Trash2, AlertCircle } from "lucide-react";
-import { 
-  fetchItemWithBitstreams, 
-  updateItem, 
-  uploadBitstream,
-  deleteBitstream,
-  getMetadataValue,
-  getMetadataValues,
-  Bitstream,
-} from "@/api/itemApi";
+import {
+  Loader2,
+  Pencil,
+  Trash2,
+  Save,
+  X,
+  Plus,
+  Download,
+  Upload,
+  FileText,
+  AlertCircle,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  fetchItemWithBitstreams,
+  updateItemMetadata,
+  deleteItem,
+  deleteBitstream,
+  downloadBitstream,
+  uploadBitstream,
+  fetchItemBundles,
+  fetchBundleBitstreams,
+  Item,
+  Bitstream,
+  ItemMetadata,
+} from "@/api/itemApi";
+import { fetchMetadataFieldsBySchema, MetadataField } from "@/api/metadataApi";
+import axiosInstance from "@/api/axiosInstance";
 
-interface MetadataField {
-  id: string;
-  value: string;
+interface PatchOperation {
+  op: "add" | "replace" | "remove";
+  path: string;
+  value?: any;
+}
+
+interface EditingField {
+  key: string;
+  index: number;
 }
 
 interface FileToUpload {
@@ -40,255 +78,308 @@ const EditItem = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
+  // Item data
+  const [itemInfo, setItemInfo] = useState<Item | null>(null);
+  const [originalItemInfo, setOriginalItemInfo] = useState<Item | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [itemNotFound, setItemNotFound] = useState(false);
-  
-  // Metadata fields
-  const [title, setTitle] = useState("");
-  const [authors, setAuthors] = useState<MetadataField[]>([{ id: "1", value: "" }]);
-  const [dateIssued, setDateIssued] = useState("");
-  const [abstract, setAbstract] = useState("");
-  const [subjects, setSubjects] = useState<MetadataField[]>([{ id: "1", value: "" }]);
-  const [publisher, setPublisher] = useState("");
-  const [type, setType] = useState("");
-  const [language, setLanguage] = useState("en");
-  
-  // Files
-  const [existingFiles, setExistingFiles] = useState<Bitstream[]>([]);
+
+  // Editing state
+  const [editingField, setEditingField] = useState<EditingField | null>(null);
+  const [editedValue, setEditedValue] = useState("");
+  const [pendingUpdates, setPendingUpdates] = useState<PatchOperation[]>([]);
+
+  // Bitstreams
+  const [originalBitstreams, setOriginalBitstreams] = useState<Bitstream[]>([]);
+  const [thumbnailBitstreams, setThumbnailBitstreams] = useState<Bitstream[]>([]);
+  const [pendingBitstreamDeletions, setPendingBitstreamDeletions] = useState<string[]>([]);
   const [newFiles, setNewFiles] = useState<FileToUpload[]>([]);
-  const [filesToDelete, setFilesToDelete] = useState<string[]>([]);
+
+  // Add metadata state
+  const [showAddMetadata, setShowAddMetadata] = useState(false);
+  const [metadataFields, setMetadataFields] = useState<MetadataField[]>([]);
+  const [selectedFieldId, setSelectedFieldId] = useState("");
+  const [newMetadataValue, setNewMetadataValue] = useState("");
+  const [metadataPage, setMetadataPage] = useState(0);
+  const [hasMoreMetadata, setHasMoreMetadata] = useState(true);
+
+  // Delete dialog
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bitstreamToDelete, setBitstreamToDelete] = useState<Bitstream | null>(null);
 
   useEffect(() => {
-    if (id) {
-      loadItem();
-    }
+    if (id) loadItem();
   }, [id]);
 
   const loadItem = async () => {
     if (!id) return;
-
+    setLoading(true);
     try {
-      setLoading(true);
       const item = await fetchItemWithBitstreams(id);
-
       if (!item) {
         setItemNotFound(true);
         return;
       }
 
-      // Load title
-      setTitle(getMetadataValue(item.metadata, "dc.title") || "");
+      setItemInfo(item);
+      setOriginalItemInfo(JSON.parse(JSON.stringify(item)));
 
-      // Load authors
-      const authorValues = getMetadataValues(item.metadata, "dc.contributor.author");
-      if (authorValues.length > 0) {
-        setAuthors(authorValues.map((value, index) => ({
-          id: `author-${index}`,
-          value,
-        })));
-      }
-
-      // Load date
-      setDateIssued(getMetadataValue(item.metadata, "dc.date.issued") || "");
-
-      // Load abstract
-      setAbstract(getMetadataValue(item.metadata, "dc.description.abstract") || "");
-
-      // Load subjects
-      const subjectValues = getMetadataValues(item.metadata, "dc.subject");
-      if (subjectValues.length > 0) {
-        setSubjects(subjectValues.map((value, index) => ({
-          id: `subject-${index}`,
-          value,
-        })));
-      }
-
-      // Load publisher
-      setPublisher(getMetadataValue(item.metadata, "dc.publisher") || "");
-
-      // Load type
-      setType(getMetadataValue(item.metadata, "dc.type") || "");
-
-      // Load language
-      setLanguage(getMetadataValue(item.metadata, "dc.language") || "en");
-
-      // Load existing files
+      // Extract bitstreams from bundles
       const bundles = item.bundles || [];
-      const originalBundle = bundles.find(b => b.name === "ORIGINAL");
-      if (originalBundle && originalBundle.bitstreams) {
-        setExistingFiles(originalBundle.bitstreams);
-      }
-    } catch (error: any) {
-      console.error("Error loading item:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load item",
-        variant: "destructive",
-      });
+      const origBundle = bundles.find((b) => b.name === "ORIGINAL");
+      const thumbBundle = bundles.find((b) => b.name === "THUMBNAIL");
+      setOriginalBitstreams(origBundle?.bitstreams || []);
+      setThumbnailBitstreams(thumbBundle?.bitstreams || []);
+    } catch (error) {
+      console.error("Load item error:", error);
+      toast({ title: "Error", description: "Failed to load item", variant: "destructive" });
       setItemNotFound(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleNewFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files).map(file => ({
-        file,
-        id: Math.random().toString(36).substr(2, 9),
-      }));
-      setNewFiles(prev => [...prev, ...files]);
-    }
+  // --- Metadata Editing ---
+  const handleEditClick = (key: string, index: number, value: string) => {
+    setEditingField({ key, index });
+    setEditedValue(value);
   };
 
-  const removeNewFile = (id: string) => {
-    setNewFiles(prev => prev.filter(f => f.id !== id));
-  };
+  const handleSaveClick = () => {
+    if (!editingField || !itemInfo) return;
 
-  const markFileForDeletion = (bitstreamId: string) => {
-    setFilesToDelete(prev => [...prev, bitstreamId]);
-  };
+    const { key, index } = editingField;
+    const originalValue = originalItemInfo?.metadata[key]?.[index]?.value;
 
-  const unmarkFileForDeletion = (bitstreamId: string) => {
-    setFilesToDelete(prev => prev.filter(id => id !== bitstreamId));
-  };
-
-  const addAuthor = () => {
-    setAuthors(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), value: "" }]);
-  };
-
-  const removeAuthor = (id: string) => {
-    if (authors.length > 1) {
-      setAuthors(prev => prev.filter(a => a.id !== id));
-    }
-  };
-
-  const updateAuthor = (id: string, value: string) => {
-    setAuthors(prev => prev.map(a => a.id === id ? { ...a, value } : a));
-  };
-
-  const addSubject = () => {
-    setSubjects(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), value: "" }]);
-  };
-
-  const removeSubject = (id: string) => {
-    if (subjects.length > 1) {
-      setSubjects(prev => prev.filter(s => s.id !== id));
-    }
-  };
-
-  const updateSubject = (id: string, value: string) => {
-    setSubjects(prev => prev.map(s => s.id === id ? { ...s, value } : s));
-  };
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!id) return;
-
-    // Validation
-    if (!title.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Title is required",
-        variant: "destructive",
+    // Add to pending updates
+    if (editedValue !== originalValue) {
+      setPendingUpdates((prev) => {
+        // Remove any existing op for this field/index
+        const filtered = prev.filter(
+          (op) => op.path !== `/metadata/${key}/${index}`
+        );
+        return [
+          ...filtered,
+          {
+            op: "replace",
+            path: `/metadata/${key}/${index}`,
+            value: {
+              value: editedValue,
+              language: null,
+              authority: null,
+              confidence: -1,
+            },
+          },
+        ];
       });
-      return;
     }
 
-    if (!dateIssued) {
-      toast({
-        title: "Validation Error",
-        description: "Date Issued is required",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Update local state immediately
+    setItemInfo((prev) => {
+      if (!prev) return prev;
+      const newMetadata = { ...prev.metadata };
+      if (newMetadata[key]) {
+        newMetadata[key] = newMetadata[key].map((v, i) =>
+          i === index ? { ...v, value: editedValue } : v
+        );
+      }
+      return { ...prev, metadata: newMetadata };
+    });
 
-    setSaving(true);
+    setEditingField(null);
+    setEditedValue("");
+  };
 
+  const handleCancelClick = () => {
+    setEditingField(null);
+    setEditedValue("");
+  };
+
+  const handleDeleteMetadata = (key: string, index: number) => {
+    setPendingUpdates((prev) => [
+      ...prev,
+      { op: "remove", path: `/metadata/${key}/${index}` },
+    ]);
+
+    // Update local state
+    setItemInfo((prev) => {
+      if (!prev) return prev;
+      const newMetadata = { ...prev.metadata };
+      if (newMetadata[key]) {
+        newMetadata[key] = newMetadata[key].filter((_, i) => i !== index);
+        if (newMetadata[key].length === 0) {
+          delete newMetadata[key];
+        }
+      }
+      return { ...prev, metadata: newMetadata };
+    });
+  };
+
+  // --- Add Metadata ---
+  const loadMetadataFields = async (page: number = 0) => {
     try {
-      // Prepare metadata
-      const metadata: Record<string, Array<{ value: string; language?: string }>> = {
-        "dc.title": [{ value: title, language: "en" }],
-        "dc.date.issued": [{ value: dateIssued }],
-      };
+      const result = await fetchMetadataFieldsBySchema("dc", page, 50);
+      if (page === 0) {
+        setMetadataFields(result.fields);
+      } else {
+        setMetadataFields((prev) => [...prev, ...result.fields]);
+      }
+      setHasMoreMetadata(result.page.number < result.page.totalPages - 1);
+      setMetadataPage(page);
+    } catch (error) {
+      console.error("Load metadata fields error:", error);
+    }
+  };
 
-      // Add authors
-      const validAuthors = authors.filter(a => a.value.trim());
-      if (validAuthors.length > 0) {
-        metadata["dc.contributor.author"] = validAuthors.map(a => ({ value: a.value }));
+  const handleShowAddMetadata = () => {
+    setShowAddMetadata(true);
+    if (metadataFields.length === 0) {
+      loadMetadataFields(0);
+    }
+  };
+
+  const handleAddMetadata = () => {
+    if (!selectedFieldId || !newMetadataValue.trim()) {
+      toast({ title: "Error", description: "Select a field and enter a value", variant: "destructive" });
+      return;
+    }
+
+    const field = metadataFields.find((f) => String(f.id) === selectedFieldId);
+    if (!field) return;
+
+    const prefix = field._embedded?.schema?.prefix || field.schema?.prefix || "dc";
+    const fieldName = field.qualifier
+      ? `${prefix}.${field.element}.${field.qualifier}`
+      : `${prefix}.${field.element}`;
+
+    // Add to pending
+    setPendingUpdates((prev) => [
+      ...prev,
+      {
+        op: "add",
+        path: `/metadata/${fieldName}/-`,
+        value: {
+          value: newMetadataValue.trim(),
+          language: null,
+          authority: null,
+          confidence: -1,
+        },
+      },
+    ]);
+
+    // Update local state
+    setItemInfo((prev) => {
+      if (!prev) return prev;
+      const newMetadata = { ...prev.metadata };
+      if (!newMetadata[fieldName]) {
+        newMetadata[fieldName] = [];
+      }
+      newMetadata[fieldName] = [
+        ...newMetadata[fieldName],
+        { value: newMetadataValue.trim() },
+      ];
+      return { ...prev, metadata: newMetadata };
+    });
+
+    setNewMetadataValue("");
+    setSelectedFieldId("");
+  };
+
+  // --- Save / Discard All ---
+  const handleSaveAll = async () => {
+    if (!id) return;
+    setSaving(true);
+    try {
+      // Apply metadata patch operations
+      if (pendingUpdates.length > 0) {
+        await axiosInstance.patch(`/api/core/items/${id}`, pendingUpdates);
       }
 
-      // Add abstract
-      if (abstract.trim()) {
-        metadata["dc.description.abstract"] = [{ value: abstract, language: "en" }];
-      }
-
-      // Add subjects
-      const validSubjects = subjects.filter(s => s.value.trim());
-      if (validSubjects.length > 0) {
-        metadata["dc.subject"] = validSubjects.map(s => ({ value: s.value, language: "en" }));
-      }
-
-      // Add publisher
-      if (publisher.trim()) {
-        metadata["dc.publisher"] = [{ value: publisher, language: "en" }];
-      }
-
-      // Add type
-      if (type.trim()) {
-        metadata["dc.type"] = [{ value: type, language: "en" }];
-      }
-
-      // Add language
-      metadata["dc.language"] = [{ value: language }];
-
-      // Update item metadata
-      await updateItem(id, metadata);
-
-      // Delete marked files
-      for (const bitstreamId of filesToDelete) {
-        await deleteBitstream(bitstreamId);
+      // Delete bitstreams
+      for (const bsId of pendingBitstreamDeletions) {
+        await deleteBitstream(bsId);
       }
 
       // Upload new files
-      for (const fileToUpload of newFiles) {
-        await uploadBitstream(id, fileToUpload.file);
+      for (const fw of newFiles) {
+        await uploadBitstream(id, fw.file);
       }
 
-      toast({
-        title: "Success!",
-        description: "Item updated successfully",
-      });
+      toast({ title: "Success", description: "Item updated successfully!" });
+      setPendingUpdates([]);
+      setPendingBitstreamDeletions([]);
+      setNewFiles([]);
 
-      navigate(`/documents/${id}`);
-    } catch (error: any) {
-      console.error("Error updating item:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update item",
-        variant: "destructive",
-      });
+      // Reload
+      await loadItem();
+    } catch (error) {
+      console.error("Save error:", error);
+      toast({ title: "Error", description: "Failed to save changes", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDiscardAll = () => {
+    setPendingUpdates([]);
+    setPendingBitstreamDeletions([]);
+    setNewFiles([]);
+    if (originalItemInfo) {
+      setItemInfo(JSON.parse(JSON.stringify(originalItemInfo)));
+    }
+    toast({ title: "Info", description: "All pending changes discarded" });
+  };
+
+  // --- Bitstream Management ---
+  const handleDownloadBitstream = async (bitstreamId: string, fileName: string) => {
+    try {
+      await downloadBitstream(bitstreamId, fileName);
+    } catch {
+      toast({ title: "Error", description: "Failed to download file", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteBitstreamClick = (bitstream: Bitstream) => {
+    setBitstreamToDelete(bitstream);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDeleteBitstream = () => {
+    if (bitstreamToDelete) {
+      setPendingBitstreamDeletions((prev) => [...prev, bitstreamToDelete.id]);
+      setOriginalBitstreams((prev) => prev.filter((b) => b.id !== bitstreamToDelete.id));
+      toast({ title: "Queued", description: "Bitstream deletion queued. Click Save to confirm." });
+    }
+    setDeleteDialogOpen(false);
+    setBitstreamToDelete(null);
+  };
+
+  const handleNewFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const files = Array.from(e.target.files).map((file) => ({
+        file,
+        id: Math.random().toString(36).substr(2, 9),
+      }));
+      setNewFiles((prev) => [...prev, ...files]);
+    }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return "0 Bytes";
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (Math.round((bytes / Math.pow(k, i)) * 100) / 100) + " " + sizes[i];
+  };
+
+  const hasChanges = pendingUpdates.length > 0 || pendingBitstreamDeletions.length > 0 || newFiles.length > 0;
+
   if (loading) {
     return (
       <AppLayout>
-        <div className="container max-w-4xl py-8 flex items-center justify-center">
+        <div className="container max-w-5xl py-8 flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
       </AppLayout>
@@ -298,16 +389,12 @@ const EditItem = () => {
   if (itemNotFound) {
     return (
       <AppLayout>
-        <div className="container max-w-4xl py-8">
+        <div className="container max-w-5xl py-8">
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Item not found or you don't have permission to edit it.
-            </AlertDescription>
+            <AlertDescription>Item not found or you don't have permission to edit it.</AlertDescription>
           </Alert>
-          <Button onClick={() => navigate(-1)} className="mt-4">
-            Go Back
-          </Button>
+          <Button onClick={() => navigate(-1)} className="mt-4">Go Back</Button>
         </div>
       </AppLayout>
     );
@@ -315,305 +402,321 @@ const EditItem = () => {
 
   return (
     <AppLayout>
-      <div className="container max-w-4xl py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Edit Item</h1>
-          <p className="text-muted-foreground">Modify item metadata and files</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Required Metadata */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Required Metadata</CardTitle>
-              <CardDescription>Fields marked with * are required</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  placeholder="Enter item title"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="dateIssued">Date Issued *</Label>
-                <Input
-                  id="dateIssued"
-                  type="date"
-                  value={dateIssued}
-                  onChange={(e) => setDateIssued(e.target.value)}
-                  required
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Optional Metadata */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Optional Metadata</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Authors */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Authors</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addAuthor}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Author
-                  </Button>
-                </div>
-                {authors.map((author, index) => (
-                  <div key={author.id} className="flex gap-2">
-                    <Input
-                      placeholder={`Author ${index + 1}`}
-                      value={author.value}
-                      onChange={(e) => updateAuthor(author.id, e.target.value)}
-                    />
-                    {authors.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeAuthor(author.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Abstract */}
-              <div className="space-y-2">
-                <Label htmlFor="abstract">Abstract / Description</Label>
-                <Textarea
-                  id="abstract"
-                  placeholder="Enter item abstract or description"
-                  value={abstract}
-                  onChange={(e) => setAbstract(e.target.value)}
-                  rows={4}
-                />
-              </div>
-
-              {/* Subjects */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>Subject Keywords</Label>
-                  <Button type="button" variant="outline" size="sm" onClick={addSubject}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Subject
-                  </Button>
-                </div>
-                {subjects.map((subject, index) => (
-                  <div key={subject.id} className="flex gap-2">
-                    <Input
-                      placeholder={`Subject ${index + 1}`}
-                      value={subject.value}
-                      onChange={(e) => updateSubject(subject.id, e.target.value)}
-                    />
-                    {subjects.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeSubject(subject.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Publisher */}
-              <div className="space-y-2">
-                <Label htmlFor="publisher">Publisher</Label>
-                <Input
-                  id="publisher"
-                  placeholder="Enter publisher name"
-                  value={publisher}
-                  onChange={(e) => setPublisher(e.target.value)}
-                />
-              </div>
-
-              {/* Type */}
-              <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
-                <Input
-                  id="type"
-                  placeholder="e.g., Clinical Guidelines, Report, Article"
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                />
-              </div>
-
-              {/* Language */}
-              <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
-                <Select value={language} onValueChange={setLanguage}>
-                  <SelectTrigger id="language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="de">German</SelectItem>
-                    <SelectItem value="hi">Hindi</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* File Management */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Files</CardTitle>
-              <CardDescription>
-                Manage attached files
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Existing Files */}
-              {existingFiles.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-medium">Existing Files:</h4>
-                  {existingFiles.map((bitstream) => {
-                    const isMarkedForDeletion = filesToDelete.includes(bitstream.id);
-                    return (
-                      <div
-                        key={bitstream.id}
-                        className={`flex items-center justify-between p-3 rounded-lg ${
-                          isMarkedForDeletion
-                            ? "bg-destructive/10 border border-destructive"
-                            : "bg-muted"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className={`font-medium ${isMarkedForDeletion ? "line-through" : ""}`}>
-                              {bitstream.name}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {formatBytes(bitstream.sizeBytes)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          {isMarkedForDeletion ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => unmarkFileForDeletion(bitstream.id)}
-                            >
-                              Undo
-                            </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => markFileForDeletion(bitstream.id)}
-                            >
-                              <Trash2 className="h-4 w-4 mr-1" />
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Add New Files */}
-              <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add new files (max 50MB per file)
-                </p>
-                <Input
-                  type="file"
-                  multiple
-                  onChange={handleNewFileSelect}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <Label htmlFor="file-upload">
-                  <Button type="button" variant="outline" asChild>
-                    <span>Choose Files</span>
-                  </Button>
-                </Label>
-              </div>
-
-              {/* New Files */}
-              {newFiles.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="font-medium">New Files to Upload:</h4>
-                  {newFiles.map((fileWrapper) => (
-                    <div
-                      key={fileWrapper.id}
-                      className="flex items-center justify-between p-3 bg-primary/10 rounded-lg border border-primary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <div>
-                          <p className="font-medium">{fileWrapper.file.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {formatBytes(fileWrapper.file.size)}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeNewFile(fileWrapper.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <div className="flex gap-4">
+      <div className="container max-w-5xl py-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">
+              Edit Item: <span className="text-primary">{itemInfo?.name}</span>
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              {pendingUpdates.length + pendingBitstreamDeletions.length + newFiles.length} pending change(s)
+            </p>
+          </div>
+          <div className="flex gap-2">
             <Button
-              type="submit"
-              disabled={saving}
-              className="min-w-[150px]"
+              variant="default"
+              onClick={handleSaveAll}
+              disabled={!hasChanges || saving}
             >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                "Update Item"
-              )}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Save
             </Button>
             <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate(`/documents/${id}`)}
-              disabled={saving}
+              variant="destructive"
+              onClick={handleDiscardAll}
+              disabled={!hasChanges}
             >
-              Cancel
+              Discard
+            </Button>
+            <Button variant="secondary" onClick={handleShowAddMetadata}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Metadata
             </Button>
           </div>
-        </form>
+        </div>
+
+        {/* Metadata Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Metadata</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-card rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[30%] font-bold">Field</TableHead>
+                    <TableHead className="w-[50%] font-bold">Values</TableHead>
+                    <TableHead className="text-right font-bold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itemInfo?.metadata &&
+                    Object.entries(itemInfo.metadata).map(([key, values]) => (
+                      <TableRow key={key}>
+                        <TableCell>
+                          <span className="font-semibold text-sm">{key}</span>
+                        </TableCell>
+                        <TableCell>
+                          {values.map((metadataValue, index) => (
+                            <div key={index} className="mb-1">
+                              {editingField?.key === key && editingField?.index === index ? (
+                                <Input
+                                  value={editedValue}
+                                  onChange={(e) => setEditedValue(e.target.value)}
+                                  autoFocus
+                                  className="h-8"
+                                />
+                              ) : (
+                                <span className="text-sm">{metadataValue.value}</span>
+                              )}
+                            </div>
+                          ))}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {values.map((metadataValue, index) => (
+                            <div key={index} className="mb-1 flex items-center justify-end gap-1">
+                              {editingField?.key === key && editingField?.index === index ? (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleSaveClick}>
+                                    <Save className="h-4 w-4 text-primary" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCancelClick}>
+                                    <X className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(key, index, metadataValue.value)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteMetadata(key, index)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                  {/* Add Metadata Row */}
+                  {showAddMetadata && (
+                    <TableRow className="bg-muted/30">
+                      <TableCell>
+                        <Select value={selectedFieldId} onValueChange={setSelectedFieldId}>
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Select metadata field" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {metadataFields.map((field) => {
+                              const prefix = field._embedded?.schema?.prefix || field.schema?.prefix || "dc";
+                              const name = field.qualifier
+                                ? `${prefix}.${field.element}.${field.qualifier}`
+                                : `${prefix}.${field.element}`;
+                              return (
+                                <SelectItem key={field.id} value={String(field.id)}>
+                                  {name}
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          placeholder="Enter value"
+                          value={newMetadataValue}
+                          onChange={(e) => setNewMetadataValue(e.target.value)}
+                          className="h-8"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button size="sm" onClick={handleAddMetadata}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bitstream Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Files / Bitstreams</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-card rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="font-bold">Name</TableHead>
+                    <TableHead className="font-bold">Size</TableHead>
+                    <TableHead className="font-bold">Format</TableHead>
+                    <TableHead className="text-right font-bold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* ORIGINAL Bundle Header */}
+                  <TableRow className="bg-muted/50">
+                    <TableCell colSpan={3}>
+                      <span className="font-bold text-sm">BUNDLE: ORIGINAL</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Label htmlFor="add-bitstream" className="cursor-pointer">
+                        <Button variant="ghost" size="sm" asChild>
+                          <span>
+                            <Plus className="h-4 w-4 mr-1" />
+                            Add File
+                          </span>
+                        </Button>
+                      </Label>
+                      <Input
+                        type="file"
+                        multiple
+                        accept="application/pdf,.pdf,.doc,.docx"
+                        onChange={handleNewFileSelect}
+                        className="hidden"
+                        id="add-bitstream"
+                      />
+                    </TableCell>
+                  </TableRow>
+
+                  {originalBitstreams.map((bs) => (
+                    <TableRow key={bs.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{bs.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatBytes(bs.sizeBytes)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {bs.format || bs.mimeType || "Unknown"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadBitstream(bs.id, bs.name)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteBitstreamClick(bs)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+
+                  {originalBitstreams.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground text-sm py-4">
+                        No files in ORIGINAL bundle
+                      </TableCell>
+                    </TableRow>
+                  )}
+
+                  {/* THUMBNAIL Bundle */}
+                  {thumbnailBitstreams.length > 0 && (
+                    <>
+                      <TableRow className="bg-muted/50">
+                        <TableCell colSpan={4}>
+                          <span className="font-bold text-sm">BUNDLE: THUMBNAIL</span>
+                        </TableCell>
+                      </TableRow>
+                      {thumbnailBitstreams.map((bs) => (
+                        <TableRow key={bs.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{bs.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatBytes(bs.sizeBytes)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {bs.format || "Image"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadBitstream(bs.id, bs.name)}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  )}
+
+                  {/* New files to upload */}
+                  {newFiles.length > 0 && (
+                    <>
+                      <TableRow className="bg-primary/5">
+                        <TableCell colSpan={4}>
+                          <span className="font-bold text-sm text-primary">NEW FILES TO UPLOAD</span>
+                        </TableCell>
+                      </TableRow>
+                      {newFiles.map((fw) => (
+                        <TableRow key={fw.id} className="bg-primary/5">
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Upload className="h-4 w-4 text-primary" />
+                              <span className="text-sm font-medium">{fw.file.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatBytes(fw.file.size)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {fw.file.type || "Unknown"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => setNewFiles((prev) => prev.filter((f) => f.id !== fw.id))}
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Delete Bitstream Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Bitstream</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete <strong>"{bitstreamToDelete?.name}"</strong>? This action will be applied when you save.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleConfirmDeleteBitstream}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
