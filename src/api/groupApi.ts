@@ -240,3 +240,15 @@ export const fetchNonMembers = async (
     return { users: [], page: { size, totalElements: 0, totalPages: 0, number: 0 } };
   }
 };
+
+/**
+ * Fetch groups with pagination and search
+ * Alias for searchGroups for consistency with other APIs
+ */
+export const fetchGroups = async (
+  page = 0,
+  size = 10,
+  query = ""
+): Promise<GroupListResponse> => {
+  return searchGroups(query, page, size);
+};

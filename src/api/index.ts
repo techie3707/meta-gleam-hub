@@ -14,6 +14,7 @@ export * from "./workflowApi";
 export * from "./processApi";
 export * from "./reportApi";
 export * from "./metadataApi";
+export * from "./policyApi";
 
 // Export itemApi but exclude Bitstream-related exports (use bitstreamApi instead)
 export {

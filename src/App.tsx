@@ -30,6 +30,10 @@ import EditItem from "./pages/EditItem";
 import EditCommunity from "./pages/EditCommunity";
 import CreateCollection from "./pages/CreateCollection";
 import PDFViewerPage from "./pages/PDFViewerPage";
+import Policies from "./pages/Policies";
+import ResourcePolicy from "./pages/ResourcePolicy";
+import CreateResourcePolicy from "./pages/CreateResourcePolicy";
+import CreatePolicy from "./pages/CreatePolicy";
 
 const queryClient = new QueryClient();
 
@@ -187,6 +191,54 @@ const App = () => (
               element={
                 <ProtectedRoute adminOnly>
                   <MetadataRegistry />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/policies/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Policies />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/policies/collection/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Policies />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/policies/community/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Policies />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/policies/create/:uuid"
+              element={
+                <ProtectedRoute adminOnly>
+                  <CreatePolicy />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/resource-policy/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ResourcePolicy />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/resource-policy/create/:uuid"
+              element={
+                <ProtectedRoute adminOnly>
+                  <CreateResourcePolicy />
                 </ProtectedRoute>
               }
             />

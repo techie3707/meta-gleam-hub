@@ -189,3 +189,80 @@ export const getUserFullName = (user: User): string => {
   const lastName = getUserLastName(user);
   return `${firstName} ${lastName}`.trim() || user.email;
 };
+
+/**
+ * EPerson interface for resource policies
+ */
+export interface EPerson {
+  id: string;
+  uuid: string;
+  email: string;
+  netid: string | null;
+  lastActive: string;
+  canLogIn: boolean;
+  requireCertificate: boolean;
+  selfRegistered: boolean;
+  type: string;
+  metadata: {
+    "eperson.firstname": [{ value: string }];
+    "eperson.lastname": [{ value: string }];
+  };
+}
+
+export interface EPersonListResponse {
+  epersons: EPerson[];
+  page: {
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    number: number;
+  };
+}
+
+/**
+ * Fetch users with pagination and search
+ * Returns EPerson format for resource policies
+ */
+export const fetchUsers = async (
+  page = 0,
+  size = 10,
+  query = ""
+): Promise<EPersonListResponse> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/eperson/epersons/search/byMetadata?page=${page}&size=${size}&query=${encodeURIComponent(query)}`
+    );
+    
+    const epersons = response.data._embedded?.epersons || [];
+    
+    return {
+      epersons: epersons.map((user: any) => ({
+        id: user.id,
+        uuid: user.uuid || user.id,
+        email: user.email,
+        netid: user.netid || null,
+        lastActive: user.lastActive,
+        canLogIn: user.canLogIn,
+        requireCertificate: user.requireCertificate,
+        selfRegistered: user.selfRegistered,
+        type: user.type || "eperson",
+        metadata: user.metadata || {
+          "eperson.firstname": [{ value: "" }],
+          "eperson.lastname": [{ value: "" }],
+        },
+      })),
+      page: response.data.page || {
+        size,
+        totalElements: 0,
+        totalPages: 0,
+        number: 0,
+      },
+    };
+  } catch (error) {
+    console.error("Fetch users error:", error);
+    return {
+      epersons: [],
+      page: { size, totalElements: 0, totalPages: 0, number: 0 },
+    };
+  }
+};

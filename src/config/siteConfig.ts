@@ -99,10 +99,6 @@ export const siteConfig = {
       { name: "Dashboard", href: "/", icon: "LayoutDashboard" },
       { name: "Search", href: "/search", icon: "Search" },
       { name: "Import", href: "/import", icon: "Upload" },
-      { name: "Collections", href: "/collections", icon: "FolderOpen" },
-      { name: "Documents", href: "/documents", icon: "FileText" },
-      { name: "Tasks", href: "/tasks", icon: "CheckSquare" },
-      { name: "Billing", href: "/billing", icon: "Receipt" },
     ],
     admin: [
       { name: "Create Item", href: "/items/create", icon: "FileText" },

@@ -220,19 +220,34 @@ export const fetchProcessOutput = async (
  */
 export const uploadBatchImport = async (
   file: File,
-  collectionId: string
+  collectionId: string,
+  options?: {
+    validate?: boolean;
+    workflow?: boolean;
+  }
 ): Promise<Process> => {
   try {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append(
-      "properties",
-      JSON.stringify([
-        { name: "--add" },
-        { name: "--zip", value: file.name },
-        { name: "--collection", value: collectionId },
-      ])
-    );
+    
+    // Build properties array with optional flags
+    const properties: Array<{ name: string; value?: string }> = [
+      { name: "--add" },
+      { name: "--zip", value: file.name },
+      { name: "--collection", value: collectionId },
+    ];
+
+    // Add validation flag if requested
+    if (options?.validate) {
+      properties.push({ name: "--validate" });
+    }
+
+    // Add workflow flag if requested (ignored if validating)
+    if (options?.workflow && !options?.validate) {
+      properties.push({ name: "--workflow" });
+    }
+
+    formData.append("properties", JSON.stringify(properties));
 
     const response = await axiosInstance.post(
       "/api/system/scripts/import/processes",
