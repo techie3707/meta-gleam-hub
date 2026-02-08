@@ -4,24 +4,41 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DocumentCard } from "@/components/documents/DocumentCard";
+import { PaginationControls } from "@/components/pagination/PaginationControls";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { searchObjects } from "@/api/searchApi";
+import { siteConfig } from "@/config/siteConfig";
 
 const Documents = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(siteConfig.defaultPageSize);
 
   const { data: searchResults, isLoading } = useQuery({
-    queryKey: ["documents", searchQuery],
-    queryFn: () => searchObjects({
-      query: searchQuery || "*",
-      page: 0,
-      size: 100,
-    })
+    queryKey: ["documents", searchQuery, page, pageSize],
+    queryFn: () =>
+      searchObjects({
+        query: searchQuery || "*",
+        page: page - 1, // API uses 0-indexed
+        size: pageSize,
+      }),
   });
 
   const documents = searchResults?.results || [];
+  const totalElements = searchResults?.page?.totalElements || 0;
+  const totalPages = searchResults?.page?.totalPages || 0;
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1); // Reset to first page
+  };
 
   return (
     <AppLayout>
@@ -74,7 +91,10 @@ const Documents = () => {
             type="text"
             placeholder="Search documents..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
             className="max-w-md bg-card border-border"
           />
         </div>
@@ -92,18 +112,26 @@ const Documents = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {documents.map((item, index) => {
               if (!item) return null;
-              
+
               const doc = {
                 id: item.id,
-                title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
-                type: 'pdf' as const,
-                collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
+                title:
+                  item.metadata?.["dc.title"]?.[0]?.value ||
+                  item.name ||
+                  "Untitled",
+                type: "pdf" as const,
+                collection:
+                  item.metadata?.["dc.relation.ispartof"]?.[0]?.value ||
+                  "Unknown",
                 uploadedAt: new Date(),
-                size: 'Unknown',
-                author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
-                description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',
+                size: "Unknown",
+                author:
+                  item.metadata?.["dc.contributor.author"]?.[0]?.value ||
+                  "Unknown",
+                description:
+                  item.metadata?.["dc.description.abstract"]?.[0]?.value || "",
               };
-              
+
               return (
                 <div
                   key={doc.id}
@@ -119,18 +147,26 @@ const Documents = () => {
           <div className="space-y-3">
             {documents.map((item, index) => {
               if (!item) return null;
-              
+
               const doc = {
                 id: item.id,
-                title: item.metadata?.['dc.title']?.[0]?.value || item.name || 'Untitled',
-                type: 'pdf' as const,
-                collection: item.metadata?.['dc.relation.ispartof']?.[0]?.value || 'Unknown',
+                title:
+                  item.metadata?.["dc.title"]?.[0]?.value ||
+                  item.name ||
+                  "Untitled",
+                type: "pdf" as const,
+                collection:
+                  item.metadata?.["dc.relation.ispartof"]?.[0]?.value ||
+                  "Unknown",
                 uploadedAt: new Date(),
-                size: 'Unknown',
-                author: item.metadata?.['dc.contributor.author']?.[0]?.value || 'Unknown',
-                description: item.metadata?.['dc.description.abstract']?.[0]?.value || '',
+                size: "Unknown",
+                author:
+                  item.metadata?.["dc.contributor.author"]?.[0]?.value ||
+                  "Unknown",
+                description:
+                  item.metadata?.["dc.description.abstract"]?.[0]?.value || "",
               };
-              
+
               return (
                 <div
                   key={doc.id}
@@ -143,6 +179,17 @@ const Documents = () => {
             })}
           </div>
         )}
+
+        {/* Pagination */}
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          totalElements={totalElements}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          loading={isLoading}
+        />
       </div>
     </AppLayout>
   );

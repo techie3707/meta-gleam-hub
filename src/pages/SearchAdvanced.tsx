@@ -56,6 +56,7 @@ import { siteConfig } from "@/config/siteConfig";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { PaginationControls } from "@/components/pagination/PaginationControls";
 
 interface FacetValue {
   label: string;
@@ -945,37 +946,23 @@ const SearchAdvanced = () => {
                 {viewMode === "grid" ? renderGridView() : renderListView()}
 
                 {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 mt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const newPage = page - 1;
-                        setPage(newPage);
-                        handleSearch(filters, newPage, size, false, getSortParam());
-                      }}
-                      disabled={page === 1}
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
-                    </Button>
-                    <span className="text-sm text-muted-foreground px-4">
-                      Page {page} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const newPage = page + 1;
-                        setPage(newPage);
-                        handleSearch(filters, newPage, size, false, getSortParam());
-                      }}
-                      disabled={page >= totalPages}
-                    >
-                      Next
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
+                <PaginationControls
+                  currentPage={page}
+                  totalPages={totalPages}
+                  totalElements={totalData}
+                  pageSize={size}
+                  onPageChange={(newPage) => {
+                    setPage(newPage);
+                    handleSearch(filters, newPage, size, false, getSortParam());
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onPageSizeChange={(newSize) => {
+                    setSize(newSize);
+                    setPage(1);
+                    handleSearch(filters, 1, newSize, false, getSortParam());
+                  }}
+                  loading={loading}
+                />
               </>
             )}
           </div>
