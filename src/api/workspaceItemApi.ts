@@ -1,10 +1,10 @@
 /**
  * Workspace Item API
- * Handles workspace item creation and submission workflow
+ * Handles workspace item creation, submission workflow, and form config fetching
  */
 
 import axiosInstance from "./axiosInstance";
-import { ItemMetadata } from "./itemApi";
+import type { WorkspaceItemWithDefinition, SubmissionFormConfig } from "@/types/submission";
 
 export interface WorkspaceItem {
   id: string;
@@ -16,7 +16,7 @@ export interface WorkspaceItem {
       uuid: string;
       name: string;
       handle?: string;
-      metadata: ItemMetadata;
+      metadata: Record<string, any>;
     };
     collection?: {
       id: string;
@@ -34,94 +34,69 @@ export interface WorkspaceItem {
   };
 }
 
-export interface SubmissionFormConfig {
-  rows: Array<{
-    fields: Array<{
-      "input-type": string;
-      label: string;
-      mandatory: boolean;
-      repeatable: boolean;
-      hints?: string;
-      selectableMetadata?: Array<{
-        metadata: string;
-        label?: string;
-        closed?: boolean;
-      }>;
-    }>;
-  }>;
-}
-
 /**
- * Create a new workspace item
- * Per API docs: POST /api/submission/workspaceitems?embed=item,sections,collection&owningCollection={collectionId}
+ * Create a new workspace item AND return the full response
+ * including the embedded submissionDefinition with sections/config links.
+ *
+ * POST /api/submission/workspaceitems?embed=item,sections,collection&owningCollection={collectionId}
  */
-export const createWorkspaceItem = async (
+export const createWorkspaceItemWithDefinition = async (
   collectionId: string
-): Promise<WorkspaceItem> => {
+): Promise<WorkspaceItemWithDefinition> => {
   try {
     const response = await axiosInstance.post(
       `/api/submission/workspaceitems?embed=item,sections,collection&owningCollection=${collectionId}`,
       {}
     );
-
-    return {
-      id: response.data.id,
-      lastModified: response.data.lastModified,
-      sections: response.data.sections,
-      _embedded: response.data._embedded,
-      _links: response.data._links,
-    };
+    return response.data;
   } catch (error) {
-    console.error("Create workspace item error:", error);
+    console.error("Create workspace item with definition error:", error);
     throw error;
   }
 };
 
 /**
- * Update workspace item metadata
- * Per API docs: PATCH /api/submission/workspaceitems/{itemId}?embed=item
+ * Fetch submission form configuration
+ * GET /api/config/submissionforms/{formId}
+ *
+ * Accepts either a full URL (extracts pathname) or a relative path.
+ */
+export const fetchSubmissionFormConfig = async (
+  configUrl: string
+): Promise<SubmissionFormConfig> => {
+  try {
+    let path = configUrl;
+    // If the URL is absolute, extract just the pathname
+    if (configUrl.startsWith("http")) {
+      const url = new URL(configUrl);
+      path = url.pathname;
+    }
+    const response = await axiosInstance.get(path);
+    return response.data;
+  } catch (error) {
+    console.error("Fetch submission form config error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update workspace item metadata via JSON Patch
+ * PATCH /api/submission/workspaceitems/{itemId}?embed=item
  */
 export const updateWorkspaceItemMetadata = async (
   workspaceItemId: string,
-  fieldName: string,
-  values: Array<{
-    value: string;
-    language?: string | null;
-    authority?: string | null;
-    confidence?: number;
-    place?: number;
-    otherInformation?: string | null;
+  operations: Array<{
+    op: string;
+    path: string;
+    value?: any;
   }>
 ): Promise<WorkspaceItem> => {
   try {
-    const operations = [
-      {
-        op: "add",
-        path: `/sections/traditionalpageone/${fieldName}`,
-        value: values.map((v, index) => ({
-          value: v.value,
-          language: v.language || null,
-          authority: v.authority || null,
-          display: v.value,
-          confidence: v.confidence ?? -1,
-          place: v.place ?? index,
-          otherInformation: v.otherInformation || null,
-        })),
-      },
-    ];
-
     const response = await axiosInstance.patch(
       `/api/submission/workspaceitems/${workspaceItemId}?embed=item`,
       operations
     );
-
-    return {
-      id: response.data.id,
-      lastModified: response.data.lastModified,
-      sections: response.data.sections,
-      _embedded: response.data._embedded,
-      _links: response.data._links,
-    };
+    return response.data;
   } catch (error) {
     console.error("Update workspace item metadata error:", error);
     throw error;
@@ -129,20 +104,14 @@ export const updateWorkspaceItemMetadata = async (
 };
 
 /**
- * Add license to workspace item
- * Per API docs: PATCH /api/submission/workspaceitems/{itemId}?embed=item
+ * Grant license on workspace item
+ * PATCH /api/submission/workspaceitems/{itemId}
  */
 export const grantLicense = async (workspaceItemId: string): Promise<boolean> => {
   try {
     await axiosInstance.patch(
-      `/api/submission/workspaceitems/${workspaceItemId}?embed=item`,
-      [
-        {
-          op: "add",
-          path: "/sections/license/granted",
-          value: "true",
-        },
-      ]
+      `/api/submission/workspaceitems/${workspaceItemId}`,
+      [{ op: "add", path: "/sections/license/granted", value: "true" }]
     );
     return true;
   } catch (error) {
@@ -153,35 +122,21 @@ export const grantLicense = async (workspaceItemId: string): Promise<boolean> =>
 
 /**
  * Upload file to workspace item
- * Per API docs: POST /api/submission/workspaceitems/{itemId}
+ * POST /api/submission/workspaceitems/{itemId}
  */
 export const uploadToWorkspaceItem = async (
   workspaceItemId: string,
   file: File
-): Promise<{ success: boolean; workspaceItem?: WorkspaceItem }> => {
+): Promise<{ success: boolean; data?: any }> => {
   try {
     const formData = new FormData();
     formData.append("file", file);
-
     const response = await axiosInstance.post(
       `/api/submission/workspaceitems/${workspaceItemId}`,
       formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
+      { headers: { "Content-Type": "multipart/form-data" } }
     );
-
-    return {
-      success: true,
-      workspaceItem: {
-        id: response.data.id,
-        lastModified: response.data.lastModified,
-        _embedded: response.data._embedded,
-        _links: response.data._links,
-      },
-    };
+    return { success: true, data: response.data };
   } catch (error) {
     console.error("Upload to workspace item error:", error);
     throw error;
@@ -190,18 +145,16 @@ export const uploadToWorkspaceItem = async (
 
 /**
  * Submit workspace item to workflow
- * Per API docs: POST /api/workflow/workflowitems?embed=item,sections,collection
+ * POST /api/workflow/workflowitems?embed=item,sections,collection
+ * Body: URI of the workspace item (text/uri-list)
  */
 export const submitToWorkflow = async (workspaceItemId: string): Promise<boolean> => {
   try {
+    const baseUrl = axiosInstance.defaults.baseURL || "";
     await axiosInstance.post(
       "/api/workflow/workflowitems?embed=item,sections,collection",
-      `${axiosInstance.defaults.baseURL}/api/submission/workspaceitems/${workspaceItemId}`,
-      {
-        headers: {
-          "Content-Type": "text/uri-list",
-        },
-      }
+      `${baseUrl}/api/submission/workspaceitems/${workspaceItemId}`,
+      { headers: { "Content-Type": "text/uri-list" } }
     );
     return true;
   } catch (error) {
@@ -220,14 +173,7 @@ export const getWorkspaceItem = async (
     const response = await axiosInstance.get(
       `/api/submission/workspaceitems/${workspaceItemId}?embed=item,collection`
     );
-
-    return {
-      id: response.data.id,
-      lastModified: response.data.lastModified,
-      sections: response.data.sections,
-      _embedded: response.data._embedded,
-      _links: response.data._links,
-    };
+    return response.data;
   } catch (error) {
     console.error("Get workspace item error:", error);
     return null;
@@ -248,21 +194,6 @@ export const deleteWorkspaceItem = async (workspaceItemId: string): Promise<bool
 };
 
 /**
- * Fetch submission form configuration
- */
-export const fetchSubmissionFormConfig = async (
-  configUrl: string
-): Promise<SubmissionFormConfig | null> => {
-  try {
-    const response = await axiosInstance.get(configUrl);
-    return response.data;
-  } catch (error) {
-    console.error("Fetch submission form config error:", error);
-    return null;
-  }
-};
-
-/**
  * Get user's workspace items
  */
 export const getMyWorkspaceItems = async (
@@ -270,36 +201,20 @@ export const getMyWorkspaceItems = async (
   size: number = 20
 ): Promise<{
   items: WorkspaceItem[];
-  page: {
-    size: number;
-    totalElements: number;
-    totalPages: number;
-    number: number;
-  };
+  page: { size: number; totalElements: number; totalPages: number; number: number };
 }> => {
   try {
     const response = await axiosInstance.get(
       `/api/submission/workspaceitems?embed=item,collection&page=${page}&size=${size}`
     );
-
     const items = response.data._embedded?.workspaceitems || [];
     const pageData = response.data.page || {
-      size: size,
+      size,
       totalElements: items.length,
       totalPages: 1,
       number: page,
     };
-
-    return {
-      items: items.map((item: any) => ({
-        id: item.id,
-        lastModified: item.lastModified,
-        sections: item.sections,
-        _embedded: item._embedded,
-        _links: item._links,
-      })),
-      page: pageData,
-    };
+    return { items, page: pageData };
   } catch (error) {
     console.error("Get my workspace items error:", error);
     throw error;
