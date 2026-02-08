@@ -70,6 +70,11 @@ export const fetchSubmissionFormConfig = async (
     if (configUrl.startsWith("http")) {
       const url = new URL(configUrl);
       path = url.pathname;
+      
+      // Remove /server prefix if present since baseURL already includes it
+      if (path.startsWith("/server/")) {
+        path = path.replace("/server/", "/");
+      }
     }
     const response = await axiosInstance.get(path);
     return response.data;

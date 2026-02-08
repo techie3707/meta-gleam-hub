@@ -55,6 +55,12 @@ async function fetchCsrfToken(): Promise<string | null> {
 // Request interceptor to add auth token and CSRF token
 axiosInstance.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    // Fix duplicate /server/ in URL path
+    // This can happen when full URLs are converted to paths
+    if (config.url && config.url.startsWith("/server/")) {
+      config.url = config.url.replace("/server/", "/");
+    }
+    
     // Add auth token if available
     const authToken = localStorage.getItem(siteConfig.auth.tokenKey);
     if (authToken) {
