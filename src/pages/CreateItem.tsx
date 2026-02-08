@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -16,29 +16,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, X, FileText, Plus, Trash } from "lucide-react";
 import { fetchCollections, Collection } from "@/api/collectionApi";
-import axiosInstance from "@/api/axiosInstance";
-
-interface DynamicFormField {
-  input: { type: string };
-  label: string;
-  mandatory: boolean;
-  repeatable: boolean;
-  hints?: string;
-  mandatoryMessage?: string;
-  selectableMetadata: Array<{ metadata: string; label?: string | null; closed?: boolean }>;
-}
-
-interface FormRow {
-  fields: DynamicFormField[];
-}
-
-interface FormSection {
-  id: string;
-  header: string;
-  sectionType: string;
-  configUrl?: string;
-  rows?: FormRow[];
-}
+import {
+  createWorkspaceItemWithDefinition,
+  fetchSubmissionFormConfig,
+  updateWorkspaceItemMetadata,
+  grantLicense,
+  uploadToWorkspaceItem,
+  submitToWorkflow,
+  deleteWorkspaceItem,
+} from "@/api/workspaceItemApi";
+import type {
+  SubmissionSection,
+  SubmissionFormConfig,
+  DynamicFormField,
+  ParsedFormSection,
+} from "@/types/submission";
 
 interface FileToUpload {
   file: File;
@@ -50,28 +42,34 @@ const CreateItem = () => {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
-  const [loading, setLoading] = useState(false);
-  const [formLoading, setFormLoading] = useState(false);
+  // Collections
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [selectedCollection, setSelectedCollection] = useState(searchParams.get("collection") || "");
+  const [selectedCollection, setSelectedCollection] = useState(
+    searchParams.get("collection") || ""
+  );
 
-  // Workspace item state
-  const [workspaceItemId, setWorkspaceItemId] = useState<string | null>(null);
-  const [formSections, setFormSections] = useState<FormSection[]>([]);
+  // Workspace state
+  const [workspaceId, setWorkspaceId] = useState<string | undefined>();
 
-  // Dynamic form data: { "dc.title": "value", "dc.contributor.author_list": ["val1","val2"] }
+  // Dynamic form state
+  const [parsedSections, setParsedSections] = useState<ParsedFormSection[]>([]);
+  const [currentSectionId, setCurrentSectionId] = useState<string>("");
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   // Files
   const [files, setFiles] = useState<FileToUpload[]>([]);
+
+  // UI
+  const [loading, setLoading] = useState(false);
+  const [isLoadingForms, setIsLoadingForms] = useState(false);
 
   useEffect(() => {
     loadCollections();
   }, []);
 
   useEffect(() => {
-    if (selectedCollection) {
-      initializeWorkspaceItem(selectedCollection);
+    if (selectedCollection && !workspaceId) {
+      initializeForm(selectedCollection);
     }
   }, [selectedCollection]);
 
@@ -84,61 +82,112 @@ const CreateItem = () => {
     }
   };
 
-  const initializeWorkspaceItem = async (collectionId: string) => {
-    setFormLoading(true);
+  /**
+   * Form Generation Flow (per API docs):
+   * Step 1: POST workspace item → get submission definition
+   * Step 2: Extract submission-form sections
+   * Step 3: Fetch form configs in parallel
+   * Step 4: Render dynamic fields
+   */
+  const initializeForm = async (collectionId: string) => {
+    setIsLoadingForms(true);
+    setFormData({});
+    setParsedSections([]);
+    setWorkspaceId(undefined);
+
     try {
-      // Step 1: Create workspace item
-      const wsResponse = await axiosInstance.post(
-        `/api/submission/workspaceitems?embed=item,sections,collection&owningCollection=${collectionId}`,
-        {}
-      );
-      const wsId = wsResponse.data.id;
-      setWorkspaceItemId(String(wsId));
+      // Step 1: Create workspace item and get submission definition
+      console.log("Step 1: Creating workspace item for collection:", collectionId);
+      const workspaceData = await createWorkspaceItemWithDefinition(collectionId);
 
-      // Step 2: Extract submission definition sections
-      const submissionDef = wsResponse.data._embedded?.submissionDefinition;
-      const sections: FormSection[] = [];
-
-      if (submissionDef?._embedded?.sections?._embedded?.sections) {
-        for (const section of submissionDef._embedded.sections._embedded.sections) {
-          const s: FormSection = {
-            id: section.id,
-            header: section.header || section.id,
-            sectionType: section.sectionType,
-          };
-
-          // Step 3: If section is submission-form, fetch its config
-          if (section.sectionType === "submission-form" && section._links?.config?.href) {
-            try {
-              const configUrl = section._links.config.href;
-              // Extract path from absolute URL
-              const url = new URL(configUrl);
-              const configResponse = await axiosInstance.get(url.pathname);
-              s.rows = configResponse.data.rows || [];
-            } catch (e) {
-              console.error("Failed to fetch form config for section", section.id, e);
-            }
-          }
-
-          sections.push(s);
-        }
+      if (!workspaceData || !workspaceData.id) {
+        console.error("Workspace ID is undefined.");
+        toast({ title: "Error", description: "Failed to create workspace item", variant: "destructive" });
+        return;
       }
 
-      setFormSections(sections);
+      const wsId = workspaceData.id.toString();
+      setWorkspaceId(wsId);
+      console.log("Workspace created with ID:", wsId);
+
+      // Step 2: Extract submission-form sections from the embedded definition
+      const allSections: SubmissionSection[] =
+        workspaceData._embedded?.submissionDefinition
+          ?._embedded?.sections?._embedded?.sections || [];
+
+      console.log("All sections found:", allSections.length);
+
+      // Separate submission-form sections from upload/license
+      const formSections = allSections.filter(
+        (s) => s.sectionType === "submission-form" && s._links?.config?.href
+      );
+      const uploadSection = allSections.find((s) => s.sectionType === "upload");
+      const licenseSection = allSections.find((s) => s.sectionType === "license");
+
+      console.log("Form sections:", formSections.length);
+
+      // Step 3: Fetch form configurations in parallel
+      console.log("Step 3: Fetching form configurations...");
+      const formConfigPromises = formSections.map((section) =>
+        fetchSubmissionFormConfig(section._links.config!.href)
+      );
+      const configs = await Promise.all(formConfigPromises);
+      console.log("Form configs loaded:", configs.length);
+
+      // Build parsed sections for rendering
+      const sections: ParsedFormSection[] = [];
+
+      formSections.forEach((section, index) => {
+        sections.push({
+          id: section.id,
+          header: section.header || section.id,
+          sectionType: section.sectionType,
+          mandatory: section.mandatory,
+          configUrl: section._links.config?.href,
+          formConfig: configs[index],
+        });
+      });
+
+      // Add upload section
+      if (uploadSection) {
+        sections.push({
+          id: uploadSection.id,
+          header: uploadSection.header || "Upload",
+          sectionType: "upload",
+          mandatory: uploadSection.mandatory,
+        });
+      }
+
+      // Add license section
+      if (licenseSection) {
+        sections.push({
+          id: licenseSection.id,
+          header: licenseSection.header || "License",
+          sectionType: "license",
+          mandatory: licenseSection.mandatory,
+        });
+      }
+
+      setParsedSections(sections);
+
+      // Set first form section as current
+      if (formSections.length > 0) {
+        setCurrentSectionId(formSections[0].id);
+      }
+
+      console.log("Form initialization complete!");
     } catch (error) {
-      console.error("Failed to initialize workspace item:", error);
-      toast({ title: "Error", description: "Failed to initialize submission form", variant: "destructive" });
+      console.error("Error initializing form:", error);
+      toast({ title: "Error", description: "Failed to load form configuration", variant: "destructive" });
     } finally {
-      setFormLoading(false);
+      setIsLoadingForms(false);
     }
   };
 
-  const handleFieldChange = (metadataKey: string, value: string, repeatable: boolean) => {
-    if (repeatable) {
-      setFormData((prev) => ({ ...prev, [metadataKey]: value }));
-    } else {
-      setFormData((prev) => ({ ...prev, [metadataKey]: value }));
-    }
+  // --- Field change handlers ---
+
+  const handleFieldChange = (metadataKey: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [metadataKey]: value }));
   };
 
   const handleAddRepeatableField = (metadataKey: string) => {
@@ -146,10 +195,10 @@ const CreateItem = () => {
     if (!currentValue) return;
 
     const listKey = `${metadataKey}_list`;
-    const currentList = formData[listKey] || [];
+    const existing = formData[listKey] || [];
     setFormData((prev) => ({
       ...prev,
-      [listKey]: [...currentList, currentValue],
+      [listKey]: [...existing, currentValue],
       [metadataKey]: "",
     }));
   };
@@ -161,6 +210,8 @@ const CreateItem = () => {
       [listKey]: (prev[listKey] || []).filter((_: any, i: number) => i !== index),
     }));
   };
+
+  // --- File handlers ---
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -184,24 +235,36 @@ const CreateItem = () => {
     return (Math.round((bytes / Math.pow(k, i)) * 100) / 100) + " " + sizes[i];
   };
 
+  // --- Collection change ---
+
+  const handleCollectionChange = (collectionId: string) => {
+    // If changing collection, clean up old workspace item
+    if (workspaceId) {
+      deleteWorkspaceItem(workspaceId).catch(() => {});
+    }
+    setWorkspaceId(undefined);
+    setSelectedCollection(collectionId);
+  };
+
+  // --- Submission ---
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspaceItemId) {
+    if (!workspaceId) {
       toast({ title: "Error", description: "Workspace item not initialized", variant: "destructive" });
       return;
     }
 
     // Validate mandatory fields
-    for (const section of formSections) {
-      if (section.rows) {
-        for (const row of section.rows) {
+    for (const section of parsedSections) {
+      if (section.formConfig?.rows) {
+        for (const row of section.formConfig.rows) {
           for (const field of row.fields) {
             if (field.mandatory) {
               const key = field.selectableMetadata[0]?.metadata;
+              if (!key) continue;
               const value = formData[key];
-              const listKey = `${key}_list`;
-              const listValue = formData[listKey];
-
+              const listValue = formData[`${key}_list`];
               if (!value && (!listValue || listValue.length === 0)) {
                 toast({
                   title: "Validation Error",
@@ -217,15 +280,14 @@ const CreateItem = () => {
     }
 
     setLoading(true);
-
     try {
-      // Step 1: Build patch operations for metadata
-      const operations: any[] = [];
-      const sectionId = formSections.find((s) => s.sectionType === "submission-form")?.id || "traditionalpageone";
+      // Step 1: Build PATCH operations for each submission-form section
+      for (const section of parsedSections) {
+        if (section.sectionType !== "submission-form" || !section.formConfig) continue;
 
-      for (const section of formSections) {
-        if (!section.rows) continue;
-        for (const row of section.rows) {
+        const operations: Array<{ op: string; path: string; value?: any }> = [];
+
+        for (const row of section.formConfig.rows) {
           for (const field of row.fields) {
             const key = field.selectableMetadata[0]?.metadata;
             if (!key) continue;
@@ -233,10 +295,9 @@ const CreateItem = () => {
             let values: string[] = [];
             if (field.repeatable) {
               const listKey = `${key}_list`;
-              values = formData[listKey] || [];
-              // Also include current text if any
+              values = [...(formData[listKey] || [])];
               if (formData[key]?.trim()) {
-                values = [...values, formData[key].trim()];
+                values.push(formData[key].trim());
               }
             } else if (formData[key]) {
               values = [formData[key]];
@@ -245,7 +306,7 @@ const CreateItem = () => {
             if (values.length > 0) {
               operations.push({
                 op: "add",
-                path: `/sections/${sectionId}/${key}`,
+                path: `/sections/${section.id}/${key}`,
                 value: values.map((v, idx) => ({
                   value: v,
                   language: null,
@@ -259,39 +320,26 @@ const CreateItem = () => {
             }
           }
         }
-      }
 
-      // Submit metadata
-      if (operations.length > 0) {
-        await axiosInstance.patch(
-          `/api/submission/workspaceitems/${workspaceItemId}?embed=item`,
-          operations
-        );
+        if (operations.length > 0) {
+          console.log("Patching metadata for section:", section.id, operations);
+          await updateWorkspaceItemMetadata(workspaceId, operations);
+        }
       }
 
       // Step 2: Grant license
-      await axiosInstance.patch(
-        `/api/submission/workspaceitems/${workspaceItemId}`,
-        [{ op: "add", path: "/sections/license/granted", value: "true" }]
-      );
+      console.log("Granting license...");
+      await grantLicense(workspaceId);
 
       // Step 3: Upload files
-      for (const fileToUpload of files) {
-        const formDataObj = new FormData();
-        formDataObj.append("file", fileToUpload.file);
-        await axiosInstance.post(
-          `/api/submission/workspaceitems/${workspaceItemId}`,
-          formDataObj,
-          { headers: { "Content-Type": "multipart/form-data" } }
-        );
+      for (const fileWrapper of files) {
+        console.log("Uploading file:", fileWrapper.file.name);
+        await uploadToWorkspaceItem(workspaceId, fileWrapper.file);
       }
 
       // Step 4: Submit to workflow
-      await axiosInstance.post(
-        "/api/workflow/workflowitems?embed=item,sections,collection",
-        `/server/api/submission/workspaceitems/${workspaceItemId}`,
-        { headers: { "Content-Type": "text/uri-list" } }
-      );
+      console.log("Submitting to workflow...");
+      await submitToWorkflow(workspaceId);
 
       toast({
         title: "Success!",
@@ -300,28 +348,35 @@ const CreateItem = () => {
       navigate("/search");
     } catch (error: any) {
       console.error("Submit error:", error);
-      toast({ title: "Error", description: error?.response?.data?.message || "Failed to submit item", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to submit item",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
-  const renderField = (field: DynamicFormField) => {
-    const key = field.selectableMetadata[0]?.metadata;
-    if (!key) return null;
+  // --- Dynamic field renderer ---
+
+  const renderField = (field: DynamicFormField, sectionId: string, rowIndex: number, fieldIndex: number) => {
+    const metadata = field.selectableMetadata[0]?.metadata;
+    if (!metadata) return null;
+    const fieldKey = `${sectionId}_${metadata}_${rowIndex}_${fieldIndex}`;
     const inputType = field.input?.type || "onebox";
 
     switch (inputType) {
       case "date":
         return (
-          <div className="space-y-2" key={key}>
+          <div className="space-y-2" key={fieldKey}>
             <Label>
               {field.label} {field.mandatory && <span className="text-destructive">*</span>}
             </Label>
             <Input
               type="date"
-              value={formData[key] || ""}
-              onChange={(e) => handleFieldChange(key, e.target.value, false)}
+              value={formData[metadata] || ""}
+              onChange={(e) => handleFieldChange(metadata, e.target.value)}
               required={field.mandatory}
             />
             {field.hints && <p className="text-xs text-muted-foreground">{field.hints}</p>}
@@ -330,14 +385,14 @@ const CreateItem = () => {
 
       case "textarea":
         return (
-          <div className="space-y-2" key={key}>
+          <div className="space-y-2" key={fieldKey}>
             <Label>
               {field.label} {field.mandatory && <span className="text-destructive">*</span>}
             </Label>
             <Textarea
               rows={4}
-              value={formData[key] || ""}
-              onChange={(e) => handleFieldChange(key, e.target.value, false)}
+              value={formData[metadata] || ""}
+              onChange={(e) => handleFieldChange(metadata, e.target.value)}
               placeholder={field.hints || `Enter ${field.label.toLowerCase()}`}
             />
             {field.hints && <p className="text-xs text-muted-foreground">{field.hints}</p>}
@@ -346,11 +401,14 @@ const CreateItem = () => {
 
       case "dropdown":
         return (
-          <div className="space-y-2" key={key}>
+          <div className="space-y-2" key={fieldKey}>
             <Label>
               {field.label} {field.mandatory && <span className="text-destructive">*</span>}
             </Label>
-            <Select value={formData[key] || ""} onValueChange={(v) => handleFieldChange(key, v, false)}>
+            <Select
+              value={formData[metadata] || ""}
+              onValueChange={(v) => handleFieldChange(metadata, v)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
               </SelectTrigger>
@@ -359,7 +417,13 @@ const CreateItem = () => {
                 <SelectItem value="Thesis">Thesis</SelectItem>
                 <SelectItem value="Report">Report</SelectItem>
                 <SelectItem value="Book">Book</SelectItem>
+                <SelectItem value="Book chapter">Book chapter</SelectItem>
                 <SelectItem value="Conference Paper">Conference Paper</SelectItem>
+                <SelectItem value="Technical Report">Technical Report</SelectItem>
+                <SelectItem value="Working Paper">Working Paper</SelectItem>
+                <SelectItem value="Preprint">Preprint</SelectItem>
+                <SelectItem value="Dataset">Dataset</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
               </SelectContent>
             </Select>
             {field.hints && <p className="text-xs text-muted-foreground">{field.hints}</p>}
@@ -370,27 +434,45 @@ const CreateItem = () => {
       case "series":
       default:
         if (field.repeatable) {
-          const listKey = `${key}_list`;
+          const listKey = `${metadata}_list`;
           return (
-            <div className="space-y-2" key={key}>
+            <div className="space-y-2" key={fieldKey}>
               <Label>
                 {field.label} {field.mandatory && <span className="text-destructive">*</span>}
               </Label>
               <div className="flex gap-2">
                 <Input
-                  value={formData[key] || ""}
-                  onChange={(e) => handleFieldChange(key, e.target.value, true)}
+                  value={formData[metadata] || ""}
+                  onChange={(e) => handleFieldChange(metadata, e.target.value)}
                   placeholder={field.hints || `Enter ${field.label.toLowerCase()}`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddRepeatableField(metadata);
+                    }
+                  }}
                 />
-                <Button type="button" variant="secondary" onClick={() => handleAddRepeatableField(key)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => handleAddRepeatableField(metadata)}
+                >
                   <Plus className="h-4 w-4 mr-1" />
                   Add
                 </Button>
               </div>
               {(formData[listKey] || []).map((val: string, idx: number) => (
-                <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2 bg-muted rounded-md"
+                >
                   <span className="text-sm">{val}</span>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveRepeatableField(key, idx)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveRepeatableField(metadata, idx)}
+                  >
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
@@ -400,13 +482,13 @@ const CreateItem = () => {
           );
         }
         return (
-          <div className="space-y-2" key={key}>
+          <div className="space-y-2" key={fieldKey}>
             <Label>
               {field.label} {field.mandatory && <span className="text-destructive">*</span>}
             </Label>
             <Input
-              value={formData[key] || ""}
-              onChange={(e) => handleFieldChange(key, e.target.value, false)}
+              value={formData[metadata] || ""}
+              onChange={(e) => handleFieldChange(metadata, e.target.value)}
               placeholder={field.hints || `Enter ${field.label.toLowerCase()}`}
               required={field.mandatory}
             />
@@ -414,6 +496,15 @@ const CreateItem = () => {
           </div>
         );
     }
+  };
+
+  // --- Section header formatter ---
+  const formatSectionHeader = (header: string) => {
+    return header
+      .replace("submit.progressbar.", "")
+      .replace("describe.", "")
+      .replace(/\./g, " ")
+      .replace(/^\w/, (c) => c.toUpperCase());
   };
 
   return (
@@ -434,14 +525,14 @@ const CreateItem = () => {
             <CardContent>
               <div className="space-y-2">
                 <Label htmlFor="collection">Collection *</Label>
-                <Select value={selectedCollection} onValueChange={setSelectedCollection}>
+                <Select value={selectedCollection} onValueChange={handleCollectionChange}>
                   <SelectTrigger id="collection">
                     <SelectValue placeholder="Select a collection" />
                   </SelectTrigger>
                   <SelectContent>
-                    {collections.map((collection) => (
-                      <SelectItem key={collection.id} value={collection.id}>
-                        {collection.name}
+                    {collections.map((col) => (
+                      <SelectItem key={col.id} value={col.id}>
+                        {col.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -451,7 +542,7 @@ const CreateItem = () => {
           </Card>
 
           {/* Loading State */}
-          {formLoading && (
+          {isLoadingForms && (
             <Card>
               <CardContent className="py-12 flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -461,29 +552,33 @@ const CreateItem = () => {
           )}
 
           {/* Dynamic Form Sections */}
-          {formSections.map((section) => {
-            if (section.sectionType === "submission-form" && section.rows) {
+          {parsedSections.map((section) => {
+            // Render submission-form sections with dynamic fields
+            if (section.sectionType === "submission-form" && section.formConfig) {
               return (
                 <Card key={section.id}>
                   <CardHeader>
-                    <CardTitle>{section.header.replace("submit.progressbar.", "").replace(/^\w/, (c) => c.toUpperCase())}</CardTitle>
+                    <CardTitle>{formatSectionHeader(section.header)}</CardTitle>
                     <CardDescription>Fill in the metadata fields below</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {section.rows.map((row, rowIdx) =>
-                      row.fields.map((field) => renderField(field))
+                    {section.formConfig.rows.map((row, rowIdx) =>
+                      row.fields.map((field, fieldIdx) =>
+                        renderField(field, section.id, rowIdx, fieldIdx)
+                      )
                     )}
                   </CardContent>
                 </Card>
               );
             }
 
+            // Upload section
             if (section.sectionType === "upload") {
               return (
                 <Card key={section.id}>
                   <CardHeader>
                     <CardTitle>Upload Files</CardTitle>
-                    <CardDescription>Upload PDF files to attach to this item</CardDescription>
+                    <CardDescription>Attach files to this submission</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div
@@ -492,15 +587,14 @@ const CreateItem = () => {
                     >
                       <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
                       <p className="text-sm text-muted-foreground mb-2">
-                        ☁️ Upload Files (PDF)
+                        Click to upload files
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Click or drag and drop multiple PDF files here
+                        PDF, DOC, DOCX and other document types supported
                       </p>
                       <Input
                         type="file"
                         multiple
-                        accept="application/pdf,.pdf"
                         onChange={handleFileSelect}
                         className="hidden"
                         id="file-upload"
@@ -510,15 +604,26 @@ const CreateItem = () => {
                     {files.length > 0 && (
                       <div className="space-y-2">
                         {files.map((fw) => (
-                          <div key={fw.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                          <div
+                            key={fw.id}
+                            className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                          >
                             <div className="flex items-center gap-3">
                               <FileText className="h-5 w-5 text-muted-foreground" />
                               <div>
-                                <p className="font-medium text-sm">📄 {fw.file.name}</p>
-                                <p className="text-xs text-muted-foreground">{formatBytes(fw.file.size)}</p>
+                                <p className="font-medium text-sm">{fw.file.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatBytes(fw.file.size)}
+                                </p>
                               </div>
                             </div>
-                            <Button type="button" variant="destructive" size="sm" onClick={() => removeFile(fw.id)}>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeFile(fw.id)}
+                            >
+                              <Trash className="h-4 w-4 mr-1" />
                               Remove
                             </Button>
                           </div>
@@ -530,7 +635,7 @@ const CreateItem = () => {
               );
             }
 
-            // License section - auto-accepted
+            // License section
             if (section.sectionType === "license") {
               return (
                 <Card key={section.id}>
@@ -539,7 +644,8 @@ const CreateItem = () => {
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground">
-                      By submitting this item, you agree to the repository license agreement. The license will be automatically accepted upon submission.
+                      By submitting this item, you agree to the repository license agreement.
+                      The license will be automatically accepted upon submission.
                     </p>
                   </CardContent>
                 </Card>
@@ -549,19 +655,21 @@ const CreateItem = () => {
             return null;
           })}
 
-          {/* Fallback: Static form if no dynamic sections loaded */}
-          {!formLoading && formSections.length === 0 && selectedCollection && (
+          {/* Fallback: Static form when no dynamic sections */}
+          {!isLoadingForms && parsedSections.length === 0 && selectedCollection && (
             <Card>
               <CardHeader>
                 <CardTitle>Item Details</CardTitle>
-                <CardDescription>No submission form found. Using default fields.</CardDescription>
+                <CardDescription>
+                  No submission form found for this collection. Using default fields.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Title *</Label>
                   <Input
                     value={formData["dc.title"] || ""}
-                    onChange={(e) => handleFieldChange("dc.title", e.target.value, false)}
+                    onChange={(e) => handleFieldChange("dc.title", e.target.value)}
                     placeholder="Enter item title"
                     required
                   />
@@ -571,7 +679,7 @@ const CreateItem = () => {
                   <Input
                     type="date"
                     value={formData["dc.date.issued"] || ""}
-                    onChange={(e) => handleFieldChange("dc.date.issued", e.target.value, false)}
+                    onChange={(e) => handleFieldChange("dc.date.issued", e.target.value)}
                     required
                   />
                 </div>
@@ -579,7 +687,7 @@ const CreateItem = () => {
                   <Label>Abstract</Label>
                   <Textarea
                     value={formData["dc.description.abstract"] || ""}
-                    onChange={(e) => handleFieldChange("dc.description.abstract", e.target.value, false)}
+                    onChange={(e) => handleFieldChange("dc.description.abstract", e.target.value)}
                     rows={4}
                     placeholder="Enter abstract"
                   />
@@ -588,9 +696,13 @@ const CreateItem = () => {
             </Card>
           )}
 
-          {/* Actions */}
+          {/* Submit Actions */}
           <div className="flex gap-4">
-            <Button type="submit" disabled={loading || !selectedCollection} className="min-w-[150px]">
+            <Button
+              type="submit"
+              disabled={loading || !selectedCollection || isLoadingForms}
+              className="min-w-[150px]"
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -600,7 +712,12 @@ const CreateItem = () => {
                 "Submit Item"
               )}
             </Button>
-            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => navigate(-1)}
+              disabled={loading}
+            >
               Cancel
             </Button>
           </div>

@@ -54,12 +54,16 @@ export {
   type ProcessFile,
 } from "./batchImportApi";
 export {
+  createWorkspaceItemWithDefinition,
   getWorkspaceItem,
   getMyWorkspaceItems,
   uploadToWorkspaceItem,
   grantLicense,
   fetchSubmissionFormConfig,
-  type SubmissionFormConfig,
+  updateWorkspaceItemMetadata,
+  submitToWorkflow,
+  deleteWorkspaceItem,
 } from "./workspaceItemApi";
+export type { SubmissionFormConfig } from "@/types/submission";
 
 export { default as axiosInstance } from "./axiosInstance";
