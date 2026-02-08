@@ -15,19 +15,67 @@ const axiosInstance = axios.create({
   },
 });
 
+/**
+ * Fetch fresh CSRF token from the server
+ */
+async function fetchCsrfToken(): Promise<string | null> {
+  try {
+    const authToken = localStorage.getItem(siteConfig.auth.tokenKey);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    if (authToken) {
+      headers.Authorization = authToken;
+    }
+
+    const response = await axios.get(`${siteConfig.apiEndpoint}/api/security/csrf`, {
+      withCredentials: true,
+      headers,
+    });
+
+    // Extract CSRF token from response headers
+    const csrfToken = response.headers["dspace-xsrf-token"] || 
+                      response.headers["x-xsrf-token"] ||
+                      response.data?.token;
+
+    if (csrfToken) {
+      // Store the token for later use
+      localStorage.setItem("csrfToken", csrfToken);
+      return csrfToken;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Failed to fetch CSRF token:", error);
+    return null;
+  }
+}
+
 // Request interceptor to add auth token and CSRF token
 axiosInstance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
+  async (config: InternalAxiosRequestConfig) => {
     // Add auth token if available
     const authToken = localStorage.getItem(siteConfig.auth.tokenKey);
     if (authToken) {
       config.headers.Authorization = authToken;
     }
 
-    // Add CSRF token for state-changing requests
-    const csrfToken = getCsrfTokenFromCookie();
-    if (csrfToken && ["POST", "PUT", "PATCH", "DELETE"].includes(config.method?.toUpperCase() || "")) {
-      config.headers[siteConfig.auth.csrfHeaderName] = csrfToken;
+    // For POST, PUT, PATCH, DELETE requests, fetch fresh CSRF token
+    const method = config.method?.toUpperCase() || "";
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      // Fetch fresh CSRF token before the request
+      const freshCsrfToken = await fetchCsrfToken();
+      
+      if (freshCsrfToken) {
+        config.headers[siteConfig.auth.csrfHeaderName] = freshCsrfToken;
+      } else {
+        // Fallback to cookie/localStorage token
+        const csrfToken = getCsrfTokenFromCookie();
+        if (csrfToken) {
+          config.headers[siteConfig.auth.csrfHeaderName] = csrfToken;
+        }
+      }
     }
 
     return config;

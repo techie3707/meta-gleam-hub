@@ -1,35 +1,49 @@
 /**
  * CSRF Token Management
  * Fetches and stores CSRF token for secure requests
+ * Per API docs: GET /api/security/csrf returns token in headers
  */
 
-import axiosInstance from "./axiosInstance";
+import axios from "axios";
 import { siteConfig } from "@/config/siteConfig";
 
 let csrfToken: string | null = null;
 
 /**
  * Fetch CSRF token from the server
- * This should be called before making any state-changing requests
+ * This should be called before making any state-changing requests (POST, PATCH, PUT, DELETE)
+ * 
+ * Endpoint: GET /api/security/csrf
+ * Response: Token returned in headers["dspace-xsrf-token"]
  */
 export const fetchCsrfToken = async (): Promise<string | null> => {
   try {
-    // First try to get from cookie after a request
-    const response = await axiosInstance.get("/api/security/csrf", {
-      headers: {
-        "Content-Type": "application/json",
-      },
+    const authToken = localStorage.getItem(siteConfig.auth.tokenKey);
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    if (authToken) {
+      headers.Authorization = authToken;
+    }
+
+    // Call CSRF endpoint - use plain axios to avoid circular dependency
+    const response = await axios.get(`${siteConfig.apiEndpoint}/api/security/csrf`, {
+      withCredentials: true,
+      headers,
     });
 
-    // Check for token in response headers
-    const headerToken = response.headers["dspace-xsrf-token"];
+    // Extract token from response headers as per documentation
+    const headerToken = response.headers["dspace-xsrf-token"] || 
+                        response.headers["x-xsrf-token"];
+    
     if (headerToken) {
       csrfToken = headerToken;
       localStorage.setItem("csrfToken", headerToken);
       return csrfToken;
     }
 
-    // Also check cookies after the request
+    // Fallback: Check cookies after the request
     const cookieToken = getCsrfTokenFromCookie();
     if (cookieToken) {
       csrfToken = cookieToken;
@@ -37,6 +51,7 @@ export const fetchCsrfToken = async (): Promise<string | null> => {
       return csrfToken;
     }
 
+    console.warn("CSRF token not found in response headers or cookies");
     return null;
   } catch (error) {
     console.error("Failed to fetch CSRF token:", error);
@@ -44,6 +59,7 @@ export const fetchCsrfToken = async (): Promise<string | null> => {
     const cookieToken = getCsrfTokenFromCookie();
     if (cookieToken) {
       csrfToken = cookieToken;
+      localStorage.setItem("csrfToken", cookieToken);
       return csrfToken;
     }
     return null;
