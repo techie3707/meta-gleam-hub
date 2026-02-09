@@ -355,60 +355,89 @@ const UserManagement = () => {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New User</DialogTitle>
-            <DialogDescription>
-              Create a new user account
-            </DialogDescription>
+        <DialogTitle>Add New User</DialogTitle>
+        <DialogDescription>
+          Create a new user account
+        </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="user@example.com"
-              />
-            </div>
-            <div>
-              <Label htmlFor="firstName">First Name *</Label>
-              <Input
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) =>
-                  setFormData({ ...formData, firstName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="lastName">Last Name *</Label>
-              <Input
-                id="lastName"
-                value={formData.lastName}
-                onChange={(e) =>
-                  setFormData({ ...formData, lastName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-              />
-            </div>
+        <div>
+          <Label htmlFor="email">Email *</Label>
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) =>
+          setFormData({ ...formData, email: e.target.value })
+            }
+            placeholder="user@example.com"
+          />
+          {!formData.email && (
+            <p className="text-red-500 text-sm mt-1">
+          Email is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="firstName">First Name *</Label>
+          <Input
+            id="firstName"
+            value={formData.firstName}
+            onChange={(e) =>
+          setFormData({ ...formData, firstName: e.target.value })
+            }
+          />
+          {!formData.firstName && (
+            <p className="text-red-500 text-sm mt-1">
+          First name is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="lastName">Last Name *</Label>
+          <Input
+            id="lastName"
+            value={formData.lastName}
+            onChange={(e) =>
+          setFormData({ ...formData, lastName: e.target.value })
+            }
+          />
+          {!formData.lastName && (
+            <p className="text-red-500 text-sm mt-1">
+          Last name is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="phone">Phone</Label>
+          <Input
+            id="phone"
+            value={formData.phone}
+            onChange={(e) =>
+          setFormData({ ...formData, phone: e.target.value })
+            }
+          />
+        </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddUser}>Create User</Button>
+        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+          Cancel
+        </Button>
+        <Button
+          onClick={() => {
+            if (formData.email && formData.firstName && formData.lastName) {
+          handleAddUser();
+            } else {
+          toast({
+            title: "Validation Error",
+            description: "Please fill in all required fields.",
+            variant: "destructive",
+          });
+            }
+          }}
+        >
+          Create User
+        </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -417,49 +446,78 @@ const UserManagement = () => {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>
-              Update user information
-            </DialogDescription>
+        <DialogTitle>Edit User</DialogTitle>
+        <DialogDescription>
+          Update user information
+        </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="edit-email">Email</Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-firstName">First Name</Label>
-              <Input
-                id="edit-firstName"
-                value={formData.firstName}
-                onChange={(e) =>
-                  setFormData({ ...formData, firstName: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-lastName">Last Name</Label>
-              <Input
-                id="edit-lastName"
-                value={formData.lastName}
-                onChange={(e) =>
-                  setFormData({ ...formData, lastName: e.target.value })
-                }
-              />
-            </div>
+        <div>
+          <Label htmlFor="edit-email">Email *</Label>
+          <Input
+            id="edit-email"
+            type="email"
+            value={formData.email}
+            onChange={(e) =>
+          setFormData({ ...formData, email: e.target.value })
+            }
+          />
+          {!formData.email && (
+            <p className="text-red-500 text-sm mt-1">
+          Email is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="edit-firstName">First Name *</Label>
+          <Input
+            id="edit-firstName"
+            value={formData.firstName}
+            onChange={(e) =>
+          setFormData({ ...formData, firstName: e.target.value })
+            }
+          />
+          {!formData.firstName && (
+            <p className="text-red-500 text-sm mt-1">
+          First name is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="edit-lastName">Last Name *</Label>
+          <Input
+            id="edit-lastName"
+            value={formData.lastName}
+            onChange={(e) =>
+          setFormData({ ...formData, lastName: e.target.value })
+            }
+          />
+          {!formData.lastName && (
+            <p className="text-red-500 text-sm mt-1">
+          Last name is required.
+            </p>
+          )}
+        </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditUser}>Save Changes</Button>
+        <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+          Cancel
+        </Button>
+        <Button
+          onClick={() => {
+            if (formData.email && formData.firstName && formData.lastName) {
+          handleEditUser();
+            } else {
+          toast({
+            title: "Validation Error",
+            description: "Please fill in all required fields.",
+            variant: "destructive",
+          });
+            }
+          }}
+        >
+          Save Changes
+        </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, FolderPlus, Info } from "lucide-react";
 import { createCollection } from "@/api/collectionApi";
 import { fetchCommunities, Community } from "@/api/communityApi";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+
 
 const CreateCollection = () => {
   const navigate = useNavigate();
@@ -125,158 +125,114 @@ const CreateCollection = () => {
 
   return (
     <AppLayout>
-      <div className="container max-w-3xl py-8">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">Create New Collection</h1>
-          <p className="text-muted-foreground">Add a new collection to organize repository items</p>
-        </div>
-
-        <Alert className="mb-6">
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            <p className="font-medium mb-2">Naming Convention:</p>
-            <ul className="list-disc list-inside space-y-1 text-sm">
-              <li>Use UPPERCASE letters only</li>
-              <li>Format: CATEGORY_SUBCOLLECTION</li>
-              <li>Separate category and subcategory with underscore</li>
-              <li>Examples: NURSING_EDUCATION, CLINICAL_CARDIOLOGY, ADMINISTRATIVE_HR</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Community Selection */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Parent Community</CardTitle>
-              <CardDescription>Select the community that will contain this collection</CardDescription>
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] py-6">
+        <div className="w-full max-w-2xl px-4">
+          <Card className="shadow-lg">
+            <CardHeader className="text-center pb-6">
+              <CardTitle className="text-3xl font-bold">Create New Collection</CardTitle>
+              <CardDescription>Add a new collection to organize repository items</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label htmlFor="community">Community *</Label>
-                {loadingCommunities ? (
-                  <div className="flex items-center justify-center p-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
+            <CardContent className="pb-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Community Selection */}
+                <div className="space-y-3">
+                  <div className="mb-3">
+                    <h3 className="text-lg font-semibold">Parent Community</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Select the community that will contain this collection</p>
                   </div>
-                ) : (
-                  <Select value={selectedCommunity} onValueChange={setSelectedCommunity}>
-                    <SelectTrigger id="community">
-                      <SelectValue placeholder="Select a parent community" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {communities.map((community) => (
-                        <SelectItem key={community.id} value={community.id}>
-                          {community.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="community" className="text-sm font-medium">Community *</Label>
+                    {loadingCommunities ? (
+                      <div className="flex items-center justify-center p-8 border rounded-md">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      </div>
+                    ) : (
+                      <Select value={selectedCommunity} onValueChange={setSelectedCommunity}>
+                        <SelectTrigger id="community" className="h-10">
+                          <SelectValue placeholder="Select a parent community" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {communities.map((community) => (
+                            <SelectItem key={community.id} value={community.id}>
+                              {community.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+
+                {/* Collection Details */}
+                <div className="space-y-3">
+                  <div className="mb-3">
+
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="collectionName" className="text-sm font-medium">Collection Name *</Label>
+                      <Input
+                        id="collectionName"
+                        placeholder="e.g., NURSING_EDUCATION"
+                        value={collectionName}
+                        onChange={(e) => setCollectionName(e.target.value.toUpperCase())}
+                        required
+                        className="h-10"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Must follow format: CATEGORY_SUBCOLLECTION
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="description" className="text-sm font-medium">Description (Optional)</Label>
+                      <Textarea
+                        id="description"
+                        placeholder="Enter a brief description of this collection's purpose"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={4}
+                        className="resize-none"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Example: "Collection for nursing education materials"
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-center gap-4 pt-6 border-t">
+                  <Button
+                    type="submit"
+                    disabled={loading || loadingCommunities}
+                    className="min-w-[150px]"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <FolderPlus className="mr-2 h-4 w-4" />
+                        Create Collection
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/collections")}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
-
-          {/* Collection Details */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Collection Details</CardTitle>
-              <CardDescription>Provide basic information about the collection</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="collectionName">Collection Name *</Label>
-                <Input
-                  id="collectionName"
-                  placeholder="e.g., NURSING_EDUCATION"
-                  value={collectionName}
-                  onChange={(e) => setCollectionName(e.target.value.toUpperCase())}
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  Must follow format: CATEGORY_SUBCOLLECTION
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  placeholder="Enter a brief description of this collection's purpose"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                />
-                <p className="text-sm text-muted-foreground">
-                  Example: "Collection for nursing education materials and training documents"
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Access Policy Info */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Default Access Groups</CardTitle>
-              <CardDescription>
-                The following groups will be automatically created for this collection
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="font-mono text-sm">
-                    {collectionName || "COLLECTION_NAME"}_Read
-                  </span>
-                  <span className="text-sm text-muted-foreground ml-auto">Read permission</span>
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <span className="font-mono text-sm">
-                    {collectionName || "COLLECTION_NAME"}_Upload
-                  </span>
-                  <span className="text-sm text-muted-foreground ml-auto">Upload permission</span>
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <div className="w-2 h-2 rounded-full bg-purple-500" />
-                  <span className="font-mono text-sm">
-                    {collectionName || "COLLECTION_NAME"}_Admin
-                  </span>
-                  <span className="text-sm text-muted-foreground ml-auto">Admin permission</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Actions */}
-          <div className="flex gap-4">
-            <Button
-              type="submit"
-              disabled={loading || loadingCommunities}
-              className="min-w-[150px]"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <FolderPlus className="mr-2 h-4 w-4" />
-                  Create Collection
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => navigate("/collections")}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
+        </div>
       </div>
     </AppLayout>
   );

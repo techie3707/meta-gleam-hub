@@ -368,15 +368,21 @@ const CreateItem = () => {
 
     switch (inputType) {
       case "date":
+        // Use full date format for dc.date.created, year-only for others
+        const isCreatedDate = metadata === "dc.date.created";
         return (
           <div className="space-y-2" key={fieldKey}>
             <Label>
               {field.label} {field.mandatory && <span className="text-destructive">*</span>}
             </Label>
             <Input
-              type="date"
+              type={isCreatedDate ? "date" : "number"}
+              min={isCreatedDate ? undefined : "1900"}
+              max={isCreatedDate ? undefined : "2100"}
+              step={isCreatedDate ? undefined : "1"}
               value={formData[metadata] || ""}
               onChange={(e) => handleFieldChange(metadata, e.target.value)}
+              placeholder={isCreatedDate ? "YYYY-MM-DD" : "YYYY"}
               required={field.mandatory}
             />
             {field.hints && <p className="text-xs text-muted-foreground">{field.hints}</p>}
@@ -675,11 +681,15 @@ const CreateItem = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Date Issued *</Label>
+                  <Label>Date Issued (Year) *</Label>
                   <Input
-                    type="date"
+                    type="number"
+                    min="1900"
+                    max="2100"
+                    step="1"
                     value={formData["dc.date.issued"] || ""}
                     onChange={(e) => handleFieldChange("dc.date.issued", e.target.value)}
+                    placeholder="YYYY"
                     required
                   />
                 </div>
