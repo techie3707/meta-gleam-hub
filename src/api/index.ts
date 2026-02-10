@@ -14,7 +14,19 @@ export * from "./workflowApi";
 export * from "./processApi";
 export * from "./reportApi";
 export * from "./metadataApi";
-export * from "./policyApi";
+// Export policyApi excluding deleteResourcePolicy to avoid conflict with resourcePolicyApi
+export {
+  getResourcePolicies,
+  createResourcePolicyForEPerson,
+  createResourcePolicyForGroup,
+  updateResourcePolicyGroup,
+  updateResourcePolicyMetadata,
+  POLICY_TYPES,
+  ACTION_TYPES,
+  type Policy,
+  type ResourcePolicyData,
+  type ResourcePolicyResponse,
+} from "./policyApi";
 
 // Export itemApi but exclude Bitstream-related exports (use bitstreamApi instead)
 export {
