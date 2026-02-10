@@ -20,6 +20,8 @@ import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import SignUp from "./pages/SignUp";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import GroupManagement from "./pages/GroupManagement";
@@ -50,6 +52,8 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/signUp" element={<SignUp />} />
             <Route path="/register/:token" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/forgot/:token" element={<ResetPassword />} />
 
             {/* Protected routes */}
             <Route

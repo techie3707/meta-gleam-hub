@@ -1,6 +1,6 @@
 /**
  * SignUp Page - Step 1 of Registration
- * Collects email, password, and optional names, then sends verification email
+ * Collects email only, then sends verification email
  */
 
 import { useState } from "react";
@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Library, Loader2, Eye, EyeOff, CheckCircle, Mail } from "lucide-react";
+import { Library, Loader2, CheckCircle, Mail, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { signup, resendActivationEmail } from "@/api/signupApi";
 
@@ -17,65 +17,25 @@ const SignUp = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [resending, setResending] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
-    confirmPassword: "",
-    firstName: "",
-    lastName: "",
   });
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
+    // Email validation
     if (!formData.email) {
       errors.email = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       errors.email = "Invalid email format";
     }
 
-    if (!formData.password) {
-      errors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      errors.password = "Password must be at least 8 characters";
-    } else if (!/[A-Z]/.test(formData.password)) {
-      errors.password = "Password must contain at least one uppercase letter";
-    } else if (!/[a-z]/.test(formData.password)) {
-      errors.password = "Password must contain at least one lowercase letter";
-    } else if (!/[0-9]/.test(formData.password)) {
-      errors.password = "Password must contain at least one number";
-    } else if (!/[!@#$%^&*(),.?":{}|<>]/.test(formData.password)) {
-      errors.password = "Password must contain at least one special character";
-    }
-
-    if (!formData.confirmPassword) {
-      errors.confirmPassword = "Please confirm your password";
-    } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = "Passwords do not match";
-    }
-
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
-  };
-
-  const getPasswordStrength = (): { label: string; color: string; width: string } => {
-    const p = formData.password;
-    if (!p) return { label: "", color: "", width: "0%" };
-    let score = 0;
-    if (p.length >= 8) score++;
-    if (/[A-Z]/.test(p)) score++;
-    if (/[a-z]/.test(p)) score++;
-    if (/[0-9]/.test(p)) score++;
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(p)) score++;
-
-    if (score <= 2) return { label: "Weak", color: "bg-destructive", width: "33%" };
-    if (score <= 4) return { label: "Medium", color: "bg-yellow-500", width: "66%" };
-    return { label: "Strong", color: "bg-green-500", width: "100%" };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -88,9 +48,6 @@ const SignUp = () => {
     try {
       const result = await signup({
         email: formData.email,
-        password: formData.password,
-        firstName: formData.firstName || undefined,
-        lastName: formData.lastName || undefined,
       });
 
       if (result.status === "success") {
@@ -99,17 +56,19 @@ const SignUp = () => {
           title: "Signup successful",
           description: "Please check your email to activate your account.",
         });
-      } else if (result.errors) {
-        const errors: Record<string, string> = {};
-        result.errors.forEach((err) => {
-          errors[err.field] = err.message;
-        });
-        setFieldErrors(errors);
+      } else if (result.code === "EMAIL_EXISTS") {
+        setError("An account with this email already exists");
+        setFieldErrors({ email: "This email is already registered" });
       } else {
-        setError(result.message || "Signup failed");
+        setError(result.message || "Registration failed");
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred during signup");
+      setError(err.response?.data?.message || "An error occurred during signup");
+      toast({
+        title: "Signup failed",
+        description: err.response?.data?.message || "Please try again",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -118,23 +77,15 @@ const SignUp = () => {
   const handleResendEmail = async () => {
     setResending(true);
     try {
-      const result = await resendActivationEmail(formData.email);
-      if (result.status === "success") {
-        toast({
-          title: "Email sent",
-          description: "Activation email has been resent. Please check your inbox.",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.message || "Failed to resend email",
-          variant: "destructive",
-        });
-      }
-    } catch {
+      await resendActivationEmail(formData.email);
       toast({
-        title: "Error",
-        description: "Failed to resend activation email",
+        title: "Email resent",
+        description: "Check your inbox for the new activation link",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Failed to resend email",
+        description: err.response?.data?.message || "Please try again",
         variant: "destructive",
       });
     } finally {
@@ -142,19 +93,19 @@ const SignUp = () => {
     }
   };
 
-  const strength = getPasswordStrength();
-
+  // Success state
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md space-y-8 text-center animate-slide-up">
-          <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
-            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-green-600" />
+        <div className="w-full max-w-md bg-card p-8 rounded-xl shadow-lg border text-center space-y-6 animate-slide-up">
+          <div className="flex justify-center">
+            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
-            <h2 className="text-xl font-semibold text-foreground mb-2">
-              Check your email
-            </h2>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Check your email</h2>
+            <Mail className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-muted-foreground mb-4">
               We've sent a verification link to{" "}
               <strong className="text-foreground">{formData.email}</strong>.
@@ -202,151 +153,51 @@ const SignUp = () => {
           </div>
           <h1 className="text-2xl font-bold text-foreground">Create Your Account</h1>
           <p className="text-muted-foreground mt-2">
-            Sign up to get started with MEDANTA
+            Sign up to get started with ESD
           </p>
         </div>
 
-        {/* Signup Form */}
-        <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                {error}
-              </div>
-            )}
+        {/* Form Card */}
+        <div className="bg-card p-8 rounded-xl shadow-lg border">
+          {error && (
+            <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
+              <p className="text-sm text-destructive flex-1">{error}</p>
+            </div>
+          )}
 
+          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address *</Label>
+              <Label htmlFor="email">
+                Email address <span className="text-destructive">*</span>
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="user@example.com"
                 value={formData.email}
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="bg-secondary/50"
-                autoFocus
+                className={fieldErrors.email ? "border-destructive" : ""}
+                placeholder="you@example.com"
+                required
+                autoComplete="email"
               />
               {fieldErrors.email && (
-                <p className="text-destructive text-sm">{fieldErrors.email}</p>
+                <p className="text-sm text-destructive">{fieldErrors.email}</p>
               )}
             </div>
 
-            {/* Password */}
-            <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="bg-secondary/50 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {formData.password && (
-                <div className="space-y-1">
-                  <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${strength.color} transition-all duration-300`}
-                      style={{ width: strength.width }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Password strength: {strength.label}
-                  </p>
-                </div>
-              )}
-              {!formData.password && (
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters with uppercase, lowercase, number, and special character
-                </p>
-              )}
-              {fieldErrors.password && (
-                <p className="text-destructive text-sm">{fieldErrors.password}</p>
-              )}
-            </div>
-
-            {/* Confirm Password */}
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
-                  }
-                  className="bg-secondary/50 pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-              {formData.confirmPassword && formData.password === formData.confirmPassword && (
-                <p className="text-green-600 text-sm flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" /> Passwords match
-                </p>
-              )}
-              {fieldErrors.confirmPassword && (
-                <p className="text-destructive text-sm">{fieldErrors.confirmPassword}</p>
-              )}
-            </div>
-
-            {/* First Name */}
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                placeholder="John"
-                value={formData.firstName}
-                onChange={(e) =>
-                  setFormData({ ...formData, firstName: e.target.value })
-                }
-                className="bg-secondary/50"
-              />
-            </div>
-
-            {/* Last Name */}
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                placeholder="Doe"
-                value={formData.lastName}
-                onChange={(e) =>
-                  setFormData({ ...formData, lastName: e.target.value })
-                }
-                className="bg-secondary/50"
-              />
-            </div>
-
+            {/* Submit Button */}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating account...
+                  Sending activation link...
                 </>
               ) : (
-                "Sign Up"
+                "Continue"
               )}
             </Button>
           </form>

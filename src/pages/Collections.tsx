@@ -165,7 +165,6 @@ const Collections = () => {
                           className="group relative bg-card rounded-lg border border-border p-4 hover:shadow-lg hover:border-primary/50 transition-all duration-200 cursor-pointer overflow-hidden"
                           onClick={() => handleCollectionClick(collection.id)}
                         >
-                          {/* Background pattern - placeholder for MEDANTA.png */}
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50" />
                           
                           <div className="relative z-10">

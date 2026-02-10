@@ -195,17 +195,48 @@ export const completeRegistration = async (
 };
 
 /**
+ * Fetch user details by reset token
+ */
+export const fetchUserByEmail = async (token: string): Promise<{ email: string; epersonId: string }> => {
+  try {
+    const response = await axiosInstance.get(
+      `/api/eperson/registrations/search/findByToken?token=${token}`
+    );
+    
+    // DSpace returns email and user ID from the token
+    // For forgot password, response.data.user is the UUID string
+    // For registration, response.data.user is null
+    const email = response.data.email;
+    const epersonId = response.data.user;
+    
+    if (!email) {
+      throw new Error("Invalid or expired reset token");
+    }
+    
+    // Validate this is a forgot password token (not a registration token)
+    if (response.data.type !== "forgot" && !epersonId) {
+      throw new Error("This link is for registration, not password reset");
+    }
+    
+    return { email, epersonId };
+  } catch (error: any) {
+    console.error("Fetch user by token error:", error);
+    throw new Error(error.response?.data?.message || error.message || "Invalid or expired reset token");
+  }
+};
+
+/**
  * Reset password with token
  */
 export const resetPassword = async (
-  userId: string,
-  token: string,
-  newPassword: string
+  epersonId: string,
+  newPassword: string,
+  token: string
 ): Promise<{ success: boolean; message?: string }> => {
   try {
     await fetchCsrfToken();
     
-    await axiosInstance.patch(`/api/eperson/epersons/${userId}?token=${token}`, [
+    await axiosInstance.patch(`/api/eperson/epersons/${epersonId}?token=${token}`, [
       {
         op: "add",
         path: "/password",
@@ -218,7 +249,7 @@ export const resetPassword = async (
     return { success: true, message: "Password reset successfully" };
   } catch (error: any) {
     console.error("Reset password error:", error);
-    return { success: false, message: error.response?.data?.message || "Password reset failed" };
+    throw new Error(error.response?.data?.message || "Password reset failed");
   }
 };
 

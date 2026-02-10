@@ -1,6 +1,6 @@
 /**
  * Home Page
- * Displays collections grouped by categories with MEDANTA-style cards
+ * Displays collections grouped by categories with ESD-style cards
  * Per User Manual: Collections grouped by category (e.g., "Nursing", "Clinical")
  */
 
