@@ -92,6 +92,42 @@ const filterSections: FacetConfig[] = [
   { id: "date", label: "Joining Date", fieldName: "date", filterType: "range", defaultExpanded: false },
   { id: "doa", label: "Date of Admission", fieldName: "doa", filterType: "range", defaultExpanded: false },
   { id: "dod", label: "Date of Discharge", fieldName: "dod", filterType: "range", defaultExpanded: false },
+
+  {
+    id: 'author',
+    label: 'Author',
+    defaultExpanded: false,
+    fieldName: 'author',
+    filterType: 'checkbox'
+  },
+  {
+    id: 'contenttype',
+    label: 'Content Type',
+    defaultExpanded: false,
+    fieldName: 'contenttype',
+    filterType: 'checkbox'
+  },
+  {
+    id: 'date',
+    label: 'Date Created',
+    defaultExpanded: false,
+    fieldName: 'dateIssued',
+    filterType: 'range'
+  },
+  {
+    id: 'publisher',
+    label: 'Publisher',
+    defaultExpanded: false,
+    fieldName: 'publisher',
+    filterType: 'checkbox'
+  },
+  {
+    id: 'keyword',
+    label: 'Keyword',
+    defaultExpanded: false,
+    fieldName: 'keyword',
+    filterType: 'checkbox'
+  },
   { id: "has_content_in_original_bundle", label: "Has Files", fieldName: "has_content_in_original_bundle", filterType: "boolean", defaultExpanded: false },
 ];
 
@@ -207,11 +243,11 @@ const SearchAdvanced = () => {
   ) => {
     setLoading(true);
     const startTime = performance.now();
-    
+
     try {
       // Build API filters
       const apiFilters: Record<string, string> = {};
-      
+
       Object.entries(currentFilters).forEach(([key, value]) => {
         const section = filterSections.find((s) => s.id === key);
         if (!section) return;
@@ -259,19 +295,19 @@ const SearchAdvanced = () => {
 
       if (updateFilters) {
         setHasFileCounts(hasFileCountsResult);
-        
+
         // Fetch facets for all filter sections in parallel
         setFacetsLoading(true);
         const facetPromises = filterSections
           .filter(section => section.filterType === "checkbox")
-          .map(section => 
+          .map(section =>
             fetchFacetValues(section.fieldName, { ...params, facetSize: 5 })
               .then(facet => ({ id: section.id, facet }))
               .catch(() => ({ id: section.id, facet: { name: section.fieldName, facetType: "text", values: [], hasMore: false } }))
           );
-        
+
         const facetResults = await Promise.all(facetPromises);
-        
+
         const newFacets: Record<string, FacetValue[]> = {};
         facetResults.forEach(({ id, facet }) => {
           if (facet.values && facet.values.length > 0) {
@@ -310,7 +346,7 @@ const SearchAdvanced = () => {
     setLoadingMoreFacets((prev) => ({ ...prev, [facetId]: true }));
     try {
       const nextPage = (facetPages[facetId] || 0) + 1;
-      
+
       // Build current filters for facet request
       const apiFilters: Record<string, string> = {};
       Object.entries(filters).forEach(([key, value]) => {
@@ -426,7 +462,7 @@ const SearchAdvanced = () => {
       for (const itemId of selectedItems) {
         await deleteItem(itemId);
       }
-      
+
       toast({
         title: "Success",
         description: `${selectedItems.length} items deleted successfully.`,
@@ -471,8 +507,8 @@ const SearchAdvanced = () => {
                 {result.thumbnail?.href && (
                   <div className="w-full h-40 bg-muted rounded-md mb-3 overflow-hidden relative">
                     <img
-                      src={result.thumbnail.href.startsWith('http') 
-                        ? result.thumbnail.href 
+                      src={result.thumbnail.href.startsWith('http')
+                        ? result.thumbnail.href
                         : `${siteConfig.apiEndpoint}${result.thumbnail.href}`}
                       alt={result.name}
                       className="w-full h-full object-cover"
@@ -536,8 +572,8 @@ const SearchAdvanced = () => {
               {result.thumbnail?.href && (
                 <div className="w-24 h-32 bg-muted rounded-md overflow-hidden flex-shrink-0">
                   <img
-                    src={result.thumbnail.href.startsWith('http') 
-                      ? result.thumbnail.href 
+                    src={result.thumbnail.href.startsWith('http')
+                      ? result.thumbnail.href
                       : `${siteConfig.apiEndpoint}${result.thumbnail.href}`}
                     alt={result.name}
                     className="w-full h-full object-cover"
@@ -601,7 +637,7 @@ const SearchAdvanced = () => {
     // Handle boolean filters (Has Files)
     if (section.filterType === "boolean") {
       const isExpanded = expandedFacets.includes(section.id);
-      
+
       return (
         <Collapsible
           key={section.id}
@@ -653,10 +689,10 @@ const SearchAdvanced = () => {
         </Collapsible>
       );
     }
-    
+
     // Handle checkbox filters
     if (section.filterType !== "checkbox") return null;
-    
+
     const facetValues = facets[section.id] || [];
     if (facetValues.length === 0) return null;
 
@@ -683,7 +719,7 @@ const SearchAdvanced = () => {
             {facetValues.map((value) => {
               const currentFilter = filters[section.id] || [];
               const isChecked = Array.isArray(currentFilter) && currentFilter.includes(value.label);
-              
+
               return (
                 <div key={value.label} className="flex items-center justify-between">
                   <label className="flex items-center gap-2 cursor-pointer flex-1">
@@ -927,8 +963,8 @@ const SearchAdvanced = () => {
                   <SearchIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
                   <h3 className="text-lg font-semibold mb-2">No results found</h3>
                   <p className="text-muted-foreground mb-4">
-                    {scope 
-                      ? "This collection appears to be empty or contains no items matching your criteria." 
+                    {scope
+                      ? "This collection appears to be empty or contains no items matching your criteria."
                       : "Try adjusting your search query or filters"}
                   </p>
                   {scope && (

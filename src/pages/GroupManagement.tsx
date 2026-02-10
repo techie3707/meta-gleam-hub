@@ -440,39 +440,50 @@ const GroupManagement = () => {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Group</DialogTitle>
-            <DialogDescription>Create a new group</DialogDescription>
+        <DialogTitle>Add New Group</DialogTitle>
+        <DialogDescription>Create a new group</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="name">Group Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="e.g., Editors"
-              />
-            </div>
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="Enter group description"
-                rows={3}
-              />
-            </div>
+        <div>
+          <Label htmlFor="name">Group Name *</Label>
+          <Input
+            id="name"
+            value={formData.name}
+            onChange={(e) =>
+          setFormData({ ...formData, name: e.target.value })
+            }
+            placeholder="e.g., Editors"
+            className={formData.name.trim() === "" ? "border-red-500" : ""}
+          />
+          {formData.name.trim() === "" && (
+            <p className="text-red-500 text-sm mt-1">
+          Group name is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={formData.description}
+            onChange={(e) =>
+          setFormData({ ...formData, description: e.target.value })
+            }
+            placeholder="Enter group description"
+            rows={3}
+          />
+        </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddGroup}>Create Group</Button>
+        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleAddGroup}
+          disabled={formData.name.trim() === ""}
+        >
+          Create Group
+        </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -481,37 +492,50 @@ const GroupManagement = () => {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Group</DialogTitle>
-            <DialogDescription>Update group information</DialogDescription>
+        <DialogTitle>Edit Group</DialogTitle>
+        <DialogDescription>Update group information</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="edit-name">Group Name</Label>
-              <Input
-                id="edit-name"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-description">Description</Label>
-              <Textarea
-                id="edit-description"
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                rows={3}
-              />
-            </div>
+        <div>
+          <Label htmlFor="edit-name">Group Name *</Label>
+          <Input
+            id="edit-name"
+            value={formData.name}
+            onChange={(e) =>
+          setFormData({ ...formData, name: e.target.value })
+            }
+            placeholder="Enter group name"
+            className={formData.name.trim() === "" ? "border-red-500" : ""}
+          />
+          {formData.name.trim() === "" && (
+            <p className="text-red-500 text-sm mt-1">
+          Group name is required.
+            </p>
+          )}
+        </div>
+        <div>
+          <Label htmlFor="edit-description">Description</Label>
+          <Textarea
+            id="edit-description"
+            value={formData.description}
+            onChange={(e) =>
+          setFormData({ ...formData, description: e.target.value })
+            }
+            placeholder="Enter group description"
+            rows={3}
+          />
+        </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleEditGroup}>Save Changes</Button>
+        <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleEditGroup}
+          disabled={formData.name.trim() === ""}
+        >
+          Save Changes
+        </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

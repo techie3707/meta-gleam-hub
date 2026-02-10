@@ -1,11 +1,11 @@
 /**
  * Import Page
- * Supports single file uploads with metadata and batch import (CSV + ZIP)
- * Per User Manual: Batch import with CSV metadata and ZIP files
+ * Supports batch import with ZIP files containing documents
+ * Per User Manual: Batch import with ZIP files
  */
 
 import { useState, useEffect } from "react";
-import { Upload, X, Check, AlertCircle, FileSpreadsheet, Archive, Loader2, Download, Info } from "lucide-react";
+import { Upload, X, Check, AlertCircle, Archive, Loader2, Info } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -24,9 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchCollections, Collection } from "@/api/collectionApi";
 import { uploadBatchImport, fetchProcessById } from "@/api/processApi";
 
-
 interface BatchImportState {
-  csvFile: File | null;
   zipFile: File | null;
   collection: string;
   validateOnly: boolean;
@@ -43,16 +41,14 @@ interface BatchImportState {
 
 const Import = () => {
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [loadingCollections, setLoadingCollections] = useState(true);
   const { toast } = useToast();
 
   // Batch import state
   const [batchState, setBatchState] = useState<BatchImportState>({
-    csvFile: null,
-    validateOnly: false,
-    sendToWorkflow: false,
     zipFile: null,
     collection: "",
+    validateOnly: false,
+    sendToWorkflow: false,
     status: "idle",
     progress: 0,
     processId: null,
@@ -131,23 +127,14 @@ const Import = () => {
 
   const loadCollections = async () => {
     try {
-      setLoadingCollections(true);
       const result = await fetchCollections(0, 100);
       setCollections(result.collections);
     } catch (error) {
       console.error("Failed to load collections:", error);
-    } finally {
-      setLoadingCollections(false);
     }
   };
 
   // Batch import handlers
-  const handleCsvSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setBatchState(prev => ({ ...prev, csvFile: e.target.files![0] }));
-    }
-  };
-
   const handleZipSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setBatchState(prev => ({ ...prev, zipFile: e.target.files![0] }));
@@ -211,7 +198,6 @@ const Import = () => {
 
   const resetBatchImport = () => {
     setBatchState({
-      csvFile: null,
       zipFile: null,
       collection: "",
       validateOnly: false,
@@ -233,298 +219,235 @@ const Import = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Import Documents</h1>
           <p className="text-muted-foreground mt-1">
-            Upload documents in batch with metadata using ZIP files
+            Upload documents in batch using ZIP files
           </p>
         </div>
 
         {/* Batch Import Section */}
         <div className="bg-card rounded-xl border border-border p-6">
-              <h2 className="text-lg font-semibold text-foreground mb-4">Batch Import</h2>
-              <p className="text-sm text-muted-foreground mb-6">
-                Upload multiple items at once using a ZIP file containing your documents.
-                The system will process each file and create items in the selected collection.
-              </p>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Batch Import</h2>
+          <p className="text-sm text-muted-foreground mb-6">
+            Upload multiple items at once using a ZIP file containing your documents.
+            The system will process each file and create items in the selected collection.
+          </p>
 
-              {batchState.status === "idle" && (
-                <div className="space-y-6">
-                  {/* Collection Selection */}
-                  <div className="space-y-2">
-                    <Label>Target Collection *</Label>
-                    <Select
-                      value={batchState.collection}
-                      onValueChange={(value) => setBatchState(prev => ({ ...prev, collection: value }))}
-                    >
-                      <SelectTrigger className="max-w-md">
-                        <SelectValue placeholder="Select collection" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {collections.map((col) => (
-                          <SelectItem key={col.id} value={col.id}>
-                            {col.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+          {batchState.status === "idle" && (
+            <div className="space-y-6">
+              {/* Collection Selection */}
+              <div className="space-y-2">
+                <Label>Target Collection *</Label>
+                <Select
+                  value={batchState.collection}
+                  onValueChange={(value) => setBatchState(prev => ({ ...prev, collection: value }))}
+                >
+                  <SelectTrigger className="max-w-md">
+                    <SelectValue placeholder="Select collection" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {collections.map((col) => (
+                      <SelectItem key={col.id} value={col.id}>
+                        {col.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                  {/* CSV File */}
-                  <div className="space-y-2">
-                    <Label>CSV Metadata File (Optional)</Label>
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "flex-1 border-2 border-dashed rounded-lg p-4 transition-colors",
-                        batchState.csvFile ? "border-primary bg-primary/5" : "border-border"
-                      )}>
-                        {batchState.csvFile ? (
-                          <div className="flex items-center gap-3">
-                            <FileSpreadsheet className="w-8 h-8 text-primary" />
-                            <div>
-                              <p className="font-medium">{batchState.csvFile.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {(batchState.csvFile.size / 1024).toFixed(1)} KB
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setBatchState(prev => ({ ...prev, csvFile: null }))}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <label className="flex items-center justify-center gap-2 cursor-pointer">
-                            <FileSpreadsheet className="w-6 h-6 text-muted-foreground" />
-                            <span className="text-muted-foreground">Select CSV file with metadata</span>
-                            <input
-                              type="file"
-                              accept=".csv"
-                              onChange={handleCsvSelect}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ZIP File */}
-                  <div className="space-y-2">
-                    <Label>ZIP File with Documents *</Label>
-                    <div className="flex items-center gap-4">
-                      <div className={cn(
-                        "flex-1 border-2 border-dashed rounded-lg p-4 transition-colors",
-                        batchState.zipFile ? "border-primary bg-primary/5" : "border-border"
-                      )}>
-                        {batchState.zipFile ? (
-                          <div className="flex items-center gap-3">
-                            <Archive className="w-8 h-8 text-primary" />
-                            <div>
-                              <p className="font-medium">{batchState.zipFile.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {(batchState.zipFile.size / 1024 / 1024).toFixed(2)} MB
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setBatchState(prev => ({ ...prev, zipFile: null }))}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <label className="flex items-center justify-center gap-2 cursor-pointer">
-                            <Archive className="w-6 h-6 text-muted-foreground" />
-                            <span className="text-muted-foreground">Select ZIP file containing documents</span>
-                            <input
-                              type="file"
-                              accept=".zip"
-                              onChange={handleZipSelect}
-                              className="hidden"
-                            />
-                          </label>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* CSV Format Info */}
-                  <div className="bg-muted/50 rounded-lg p-4">
-                    <h4 className="font-medium text-foreground mb-2">CSV Format</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Your CSV file should contain the following columns:
-                    </p>
-                    <code className="text-xs bg-background p-2 rounded block overflow-x-auto">
-                      filename,dc.title,dc.contributor.author,dc.date.issued,dc.description.abstract,dc.subject
-                    </code>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      The filename column should match the file names inside your ZIP archive.
-                    </p>
-                  </div>
-
-                  {/* Import Options */}
-                  <div className="space-y-4 border-t pt-4">
-                    <h3 className="font-medium text-foreground">Import Options</h3>
-                    
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id="validate-only"
-                        checked={batchState.validateOnly}
-                        onCheckedChange={(checked) =>
-                          setBatchState(prev => ({ ...prev, validateOnly: checked as boolean }))
-                        }
-                      />
-                      <div className="grid gap-1.5 leading-none">
-                        <label
-                          htmlFor="validate-only"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                        >
-                          Validate only (test without importing)
-                        </label>
+              {/* ZIP File */}
+              <div className="space-y-2">
+                <Label>ZIP File with Documents *</Label>
+                <div className={cn(
+                  "border-2 border-dashed rounded-lg p-4 transition-colors",
+                  batchState.zipFile ? "border-primary bg-primary/5" : "border-border"
+                )}>
+                  {batchState.zipFile ? (
+                    <div className="flex items-center gap-3">
+                      <Archive className="w-8 h-8 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">{batchState.zipFile.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Check the SAF package for errors without actually importing items
+                          {(batchState.zipFile.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setBatchState(prev => ({ ...prev, zipFile: null }))}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
                     </div>
-
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        id="send-workflow"
-                        checked={batchState.sendToWorkflow}
-                        disabled={batchState.validateOnly}
-                        onCheckedChange={(checked) =>
-                          setBatchState(prev => ({ ...prev, sendToWorkflow: checked as boolean }))
-                        }
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 cursor-pointer">
+                      <Archive className="w-6 h-6 text-muted-foreground" />
+                      <span className="text-muted-foreground">Select ZIP file containing documents</span>
+                      <input
+                        type="file"
+                        accept=".zip"
+                        onChange={handleZipSelect}
+                        className="hidden"
                       />
-                      <div className="grid gap-1.5 leading-none">
-                        <label
-                          htmlFor="send-workflow"
-                          className={cn(
-                            "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
-                            batchState.validateOnly && "opacity-50"
-                          )}
-                        >
-                          Send to workflow (requires review before publication)
-                        </label>
-                        <p className="text-sm text-muted-foreground">
-                          Items will be placed in the workflow queue for review and approval
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Info Alerts */}
-                  {batchState.validateOnly && (
-                    <Alert className="border-blue-200 bg-blue-50">
-                      <Info className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-900">
-                        <strong>Validation mode:</strong> The SAF package will be checked for errors but no items will be imported. 
-                        Review the process output to see validation results.
-                      </AlertDescription>
-                    </Alert>
+                    </label>
                   )}
-
-                  {batchState.sendToWorkflow && !batchState.validateOnly && (
-                    <Alert className="border-orange-200 bg-orange-50">
-                      <Info className="h-4 w-4 text-orange-600" />
-                      <AlertDescription className="text-orange-900">
-                        <strong>Workflow mode:</strong> Items will be sent to the workflow queue and require approval before publication. 
-                        Navigate to the Workflow page to review and approve items.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Button
-                    onClick={handleBatchImport}
-                    disabled={!batchState.zipFile || !batchState.collection}
-                    className="mt-4"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {batchState.validateOnly ? "Validate Package" : "Start Batch Import"}
-                  </Button>
                 </div>
+              </div>
+
+              {/* Import Options */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="font-medium text-foreground">Import Options</h3>
+                
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="validate-only"
+                    checked={batchState.validateOnly}
+                    onCheckedChange={(checked) =>
+                      setBatchState(prev => ({ ...prev, validateOnly: checked as boolean }))
+                    }
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <label
+                      htmlFor="validate-only"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    >
+                      Validate only (test without importing)
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Check the SAF package for errors without actually importing items
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <Checkbox
+                    id="send-workflow"
+                    checked={batchState.sendToWorkflow}
+                    disabled={batchState.validateOnly}
+                    onCheckedChange={(checked) =>
+                      setBatchState(prev => ({ ...prev, sendToWorkflow: checked as boolean }))
+                    }
+                  />
+                  <div className="grid gap-1.5 leading-none">
+                    <label
+                      htmlFor="send-workflow"
+                      className={cn(
+                        "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer",
+                        batchState.validateOnly && "opacity-50"
+                      )}
+                    >
+                      Send to workflow (requires review before publication)
+                    </label>
+                    <p className="text-sm text-muted-foreground">
+                      Items will be placed in the workflow queue for review and approval
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Alerts */}
+              {batchState.validateOnly && (
+                <Alert className="border-blue-200 bg-blue-50">
+                  <Info className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-900">
+                    <strong>Validation mode:</strong> The SAF package will be checked for errors but no items will be imported. 
+                    Review the process output to see validation results.
+                  </AlertDescription>
+                </Alert>
               )}
 
-              {/* Processing State */}
-              {(batchState.status === "uploading" || batchState.status === "processing") && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        {batchState.status === "uploading" ? "Uploading files..." : "Processing import..."}
-                      </p>
-                      {batchState.totalItems > 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          {batchState.itemsProcessed} / {batchState.totalItems} items processed
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <Progress value={batchState.progress} className="h-2" />
-                  <p className="text-sm text-muted-foreground text-center">
-                    {Math.round(batchState.progress)}% complete
+              {batchState.sendToWorkflow && !batchState.validateOnly && (
+                <Alert className="border-orange-200 bg-orange-50">
+                  <Info className="h-4 w-4 text-orange-600" />
+                  <AlertDescription className="text-orange-900">
+                    <strong>Workflow mode:</strong> Items will be sent to the workflow queue and require approval before publication. 
+                    Navigate to the Workflow page to review and approve items.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <Button
+                onClick={handleBatchImport}
+                disabled={!batchState.zipFile || !batchState.collection}
+                className="mt-4"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {batchState.validateOnly ? "Validate Package" : "Start Batch Import"}
+              </Button>
+            </div>
+          )}
+
+          {/* Processing State */}
+          {(batchState.status === "uploading" || batchState.status === "processing") && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                <div className="flex-1">
+                  <p className="font-medium">
+                    {batchState.status === "uploading" ? "Uploading files..." : "Processing import..."}
+                  </p>
+                  {batchState.totalItems > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {batchState.itemsProcessed} / {batchState.totalItems} items processed
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Progress value={batchState.progress} className="h-2" />
+              <p className="text-sm text-muted-foreground text-center">
+                {Math.round(batchState.progress)}% complete
+              </p>
+            </div>
+          )}
+
+          {/* Completed State */}
+          {batchState.status === "completed" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 text-green-600">
+                <Check className="w-8 h-8" />
+                <div>
+                  <p className="font-semibold text-lg">Import Complete!</p>
+                  <p className="text-sm text-muted-foreground">
+                    Successfully imported {batchState.itemsSucceeded} items
                   </p>
                 </div>
-              )}
+              </div>
 
-              {/* Completed State */}
-              {batchState.status === "completed" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-green-600">
-                    <Check className="w-8 h-8" />
-                    <div>
-                      <p className="font-semibold text-lg">Import Complete!</p>
-                      <p className="text-sm text-muted-foreground">
-                        Successfully imported {batchState.itemsSucceeded} items
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-muted/50 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold">{batchState.totalItems}</p>
-                      <p className="text-sm text-muted-foreground">Total Items</p>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-green-600">{batchState.itemsSucceeded}</p>
-                      <p className="text-sm text-muted-foreground">Succeeded</p>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-red-600">{batchState.itemsFailed}</p>
-                      <p className="text-sm text-muted-foreground">Failed</p>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button onClick={resetBatchImport}>
-                      Start New Import
-                    </Button>
-                    <Button variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Report
-                    </Button>
-                  </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-muted/50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold">{batchState.totalItems}</p>
+                  <p className="text-sm text-muted-foreground">Total Items</p>
                 </div>
-              )}
-
-              {/* Error State */}
-              {batchState.status === "error" && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-destructive">
-                    <AlertCircle className="w-8 h-8" />
-                    <div>
-                      <p className="font-semibold">Import Failed</p>
-                      <p className="text-sm">{batchState.error}</p>
-                    </div>
-                  </div>
-                  <Button onClick={resetBatchImport}>
-                    Try Again
-                  </Button>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-green-600">{batchState.itemsSucceeded}</p>
+                  <p className="text-sm text-muted-foreground">Succeeded</p>
                 </div>
-              )}
+                <div className="bg-red-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-red-600">{batchState.itemsFailed}</p>
+                  <p className="text-sm text-muted-foreground">Failed</p>
+                </div>
+              </div>
+
+              <Button onClick={resetBatchImport}>
+                Start New Import
+              </Button>
             </div>
+          )}
+
+          {/* Error State */}
+          {batchState.status === "error" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 text-destructive">
+                <AlertCircle className="w-8 h-8" />
+                <div>
+                  <p className="font-semibold">Import Failed</p>
+                  <p className="text-sm">{batchState.error}</p>
+                </div>
+              </div>
+              <Button onClick={resetBatchImport}>
+                Try Again
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </AppLayout>
   );
