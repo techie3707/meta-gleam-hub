@@ -19,6 +19,7 @@ import Billing from "./pages/Billing";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 import UserManagement from "./pages/UserManagement";
 import GroupManagement from "./pages/GroupManagement";
@@ -47,7 +48,8 @@ const App = () => (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
+            <Route path="/signUp" element={<SignUp />} />
+            <Route path="/register/:token" element={<Register />} />
 
             {/* Protected routes */}
             <Route

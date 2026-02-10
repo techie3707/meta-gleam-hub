@@ -266,9 +266,10 @@ const GroupManagement = () => {
     }
   };
 
-  const searchAvailableUsers = async () => {
+  const searchAvailableUsers = async (queryOverride?: string) => {
     try {
-      const response = await searchUsers(userSearchQuery, 0, 20);
+      const searchTerm = queryOverride !== undefined ? queryOverride : userSearchQuery;
+      const response = await searchUsers(searchTerm, 0, 50);
       const usersData = response.users.map((user: any) => ({
         id: user.id,
         email: user.email,
@@ -279,6 +280,10 @@ const GroupManagement = () => {
     } catch (error) {
       console.error("Search users error:", error);
     }
+  };
+
+  const handleSearchButtonClick = () => {
+    searchAvailableUsers();
   };
 
   const openEditDialog = (group: Group) => {
@@ -570,7 +575,7 @@ const GroupManagement = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Button onClick={() => setShowAddMemberDialog(true)} size="sm">
+            <Button onClick={() => { setShowAddMemberDialog(true); searchAvailableUsers(""); }} size="sm">
               <UserPlus className="mr-2 h-4 w-4" />
               Add Member
             </Button>
@@ -631,7 +636,7 @@ const GroupManagement = () => {
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   placeholder="Search by email or name"
                 />
-                <Button onClick={searchAvailableUsers}>Search</Button>
+                <Button onClick={handleSearchButtonClick}>Search</Button>
               </div>
             </div>
             <div>
