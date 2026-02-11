@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, Filter, Calendar, Folder, SortAsc, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search as SearchIcon, Filter, Calendar, Folder, SortAsc, Loader2, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DocumentCard } from "@/components/documents/DocumentCard";
-import { searchObjects, fetchAllFacets, FacetCategory, SearchResult } from "@/api/searchApi";
+import { searchObjects, fetchFacetValues, fetchFacetConfiguration, FacetCategory, SearchResult, SearchFilterConfig, FacetValue } from "@/api/searchApi";
 import { fetchCollections, Collection } from "@/api/collectionApi";
 import { siteConfig } from "@/config/siteConfig";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationControls } from "@/components/pagination/PaginationControls";
+
+interface DynamicFacetState {
+  config: SearchFilterConfig;
+  values: FacetValue[];
+  expanded: boolean;
+  hasMore: boolean;
+  currentPage: number;
+  loading: boolean;
+}
 
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -31,21 +42,18 @@ const Search = () => {
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
   
-  const [facets, setFacets] = useState<FacetCategory[]>([]);
+  const [dynamicFacets, setDynamicFacets] = useState<DynamicFacetState[]>([]);
+  const [facetConfigLoading, setFacetConfigLoading] = useState(true);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
-  // Load collections for scope filter
+  // Load collections and facet config
   useEffect(() => {
     loadCollections();
-  }, []);
-
-  // Search when params change
-  useEffect(() => {
-    performSearch();
-  }, [page, size, sort, scope, selectedFilters]);
+    loadFacetConfig();
+  }, [scope]);
 
   const loadCollections = async () => {
     try {
@@ -54,6 +62,60 @@ const Search = () => {
     } catch (error) {
       console.error("Failed to load collections:", error);
     }
+  };
+
+  const loadFacetConfig = async () => {
+    setFacetConfigLoading(true);
+    try {
+      const configs = await fetchFacetConfiguration("default", scope || undefined);
+      const facetStates: DynamicFacetState[] = configs
+        .filter((c) => c.hasFacets)
+        .map((config) => ({
+          config,
+          values: [],
+          expanded: config.isOpenByDefault,
+          hasMore: false,
+          currentPage: 0,
+          loading: false,
+        }));
+      setDynamicFacets(facetStates);
+      loadDynamicFacetValues(facetStates);
+    } catch (error) {
+      console.error("Failed to load facet config:", error);
+    } finally {
+      setFacetConfigLoading(false);
+    }
+  };
+
+  const loadDynamicFacetValues = async (facetList?: DynamicFacetState[]) => {
+    const list = facetList || dynamicFacets;
+    const updated = await Promise.all(
+      list.map(async (facet) => {
+        try {
+          const result = await fetchFacetValues(facet.config.name, {
+            query: searchQuery || undefined,
+            scope: scope || undefined,
+            dsoType: "ITEM",
+            filters: selectedFilters,
+            facetSize: facet.config.facetLimit || 5,
+            facetPage: 0,
+          });
+          return { ...facet, values: result.values || [], hasMore: result.hasMore, currentPage: 0, loading: false };
+        } catch {
+          return { ...facet, values: [], hasMore: false, loading: false };
+        }
+      })
+    );
+    setDynamicFacets(updated);
+  };
+
+  const getFacetLabel = (name: string): string => {
+    const labels: Record<string, string> = {
+      author: "Author", subject: "Subject", dateIssued: "Date Issued",
+      has_content_in_original_bundle: "Has Files", entityType: "Entity Type",
+      type: "Type", publisher: "Publisher", language: "Language",
+    };
+    return labels[name] || name.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim();
   };
 
   const performSearch = async () => {
@@ -73,14 +135,10 @@ const Search = () => {
       setTotalElements(searchResult.page.totalElements);
       setTotalPages(searchResult.page.totalPages);
 
-      // Also fetch facets
-      const facetResults = await fetchAllFacets({
-        query: searchQuery || undefined,
-        scope: scope || undefined,
-        dsoType: "ITEM",
-        filters: selectedFilters,
-      });
-      setFacets(facetResults);
+      // Refresh dynamic facet values
+      if (dynamicFacets.length > 0) {
+        loadDynamicFacetValues();
+      }
     } catch (error) {
       console.error("Search error:", error);
     } finally {
@@ -369,32 +427,85 @@ const Search = () => {
 
         {/* Facets Sidebar + Results */}
         <div className="flex gap-6">
-          {/* Facets */}
-          {facets.length > 0 && showFilters && (
+          {/* Dynamic Facets Sidebar */}
+          {showFilters && (
             <div className="w-64 flex-shrink-0 space-y-4">
-              {facets.map((facet) => (
-                facet.values.length > 0 && (
-                  <div key={facet.name} className="bg-card rounded-lg border border-border p-4">
-                    <h4 className="font-medium text-foreground mb-3 capitalize">
-                      {siteConfig.sidebarFacets.find((f) => f.name === facet.name)?.label || facet.name}
-                    </h4>
-                    <div className="space-y-2">
-                      {facet.values.slice(0, 5).map((value) => (
-                        <button
-                          key={value.label}
-                          onClick={() => handleFilterChange(facet.name, value.label)}
-                          className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <span className="truncate">{value.label}</span>
-                          <Badge variant="secondary" className="ml-2">
-                            {value.count}
-                          </Badge>
-                        </button>
-                      ))}
-                    </div>
+              {facetConfigLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="bg-card rounded-lg border border-border p-4 space-y-2">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
                   </div>
-                )
-              ))}
+                ))
+              ) : (
+                dynamicFacets.map((facet) => (
+                  <div key={facet.config.name} className="bg-card rounded-lg border border-border p-4">
+                    <button
+                      className="flex items-center justify-between w-full font-medium text-foreground mb-2"
+                      onClick={() =>
+                        setDynamicFacets((prev) =>
+                          prev.map((f) =>
+                            f.config.name === facet.config.name ? { ...f, expanded: !f.expanded } : f
+                          )
+                        )
+                      }
+                    >
+                      <span className="text-sm">{getFacetLabel(facet.config.name)}</span>
+                      <ChevronDown className={`w-4 h-4 transition-transform ${facet.expanded ? "" : "-rotate-90"}`} />
+                    </button>
+
+                    {facet.expanded && (
+                      <div className="space-y-2">
+                        {facet.values.length > 0 ? (
+                          facet.values.map((value) => (
+                            <button
+                              key={value.label}
+                              onClick={() => handleFilterChange(facet.config.name, value.label)}
+                              className="flex items-center justify-between w-full text-sm text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <span className="truncate">{value.label}</span>
+                              <Badge variant="secondary" className="ml-2">{value.count}</Badge>
+                            </button>
+                          ))
+                        ) : (
+                          <p className="text-xs text-muted-foreground">No values available</p>
+                        )}
+
+                        {facet.hasMore && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full text-xs"
+                            onClick={async () => {
+                              const nextPage = facet.currentPage + 1;
+                              try {
+                                const result = await fetchFacetValues(facet.config.name, {
+                                  query: searchQuery || undefined,
+                                  scope: scope || undefined,
+                                  dsoType: "ITEM",
+                                  filters: selectedFilters,
+                                  facetSize: facet.config.facetLimit || 5,
+                                  facetPage: nextPage,
+                                });
+                                setDynamicFacets((prev) =>
+                                  prev.map((f) =>
+                                    f.config.name === facet.config.name
+                                      ? { ...f, values: [...f.values, ...(result.values || [])], hasMore: result.hasMore, currentPage: nextPage }
+                                      : f
+                                  )
+                                );
+                              } catch {}
+                            }}
+                          >
+                            Show More
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           )}
 
@@ -451,29 +562,16 @@ const Search = () => {
             )}
 
             {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 0}
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {page + 1} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page >= totalPages - 1}
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
+            <div className="mt-6">
+              <PaginationControls
+                currentPage={page}
+                totalPages={totalPages}
+                pageSize={size}
+                totalElements={totalElements}
+                onPageChange={setPage}
+                onPageSizeChange={(newSize) => { setSize(newSize); setPage(0); }}
+              />
+            </div>
           </div>
         </div>
       </div>

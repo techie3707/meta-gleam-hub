@@ -62,6 +62,7 @@ export interface FacetValue {
   label: string;
   count: number;
   value?: string;
+  authorityKey?: string;
 }
 
 export interface FacetCategory {
@@ -71,12 +72,62 @@ export interface FacetCategory {
   hasMore: boolean;
 }
 
+/** Dynamic facet filter configuration from backend */
+export interface SearchFilterConfig {
+  name: string;
+  facetType: "text" | "authority" | "date" | "hierarchical" | "standard";
+  hasFacets: boolean;
+  facetLimit: number;
+  isOpenByDefault: boolean;
+  minValue?: string;
+  maxValue?: string;
+  _links?: {
+    self?: { href: string };
+  };
+}
+
+/**
+ * Fetch dynamic facet configuration from backend
+ * GET /api/discover/facets/{configurationName}
+ */
+export const fetchFacetConfiguration = async (
+  configuration: string = "default",
+  scope?: string
+): Promise<SearchFilterConfig[]> => {
+  try {
+    const params = new URLSearchParams();
+    if (scope) params.append("scope", scope);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const response = await axiosInstance.get(`/api/discover/facets/${configuration}${qs}`);
+    
+    // Response may have filters array directly or in _embedded
+    const filters = response.data?.filters || response.data?._embedded?.filters || [];
+    return filters.map((f: any) => ({
+      name: f.name,
+      facetType: f.facetType || "text",
+      hasFacets: f.hasFacets !== false,
+      facetLimit: f.facetLimit || 5,
+      isOpenByDefault: f.isOpenByDefault || false,
+      minValue: f.minValue,
+      maxValue: f.maxValue,
+      _links: f._links,
+    }));
+  } catch (error) {
+    console.error("Fetch facet configuration error:", error);
+    // Fallback to siteConfig facets
+    return siteConfig.sidebarFacets.map((f) => ({
+      name: f.name,
+      facetType: "text" as const,
+      hasFacets: true,
+      facetLimit: f.size,
+      isOpenByDefault: false,
+    }));
+  }
+};
+
 /**
  * Search items, collections, or communities
  * Per API docs: GET /api/discover/search/objects
- * 
- * Filter format for date range:
- * f.dateIssued=[2024-01-01 TO 2024-12-31],equals
  */
 export const searchObjects = async (params: SearchParams): Promise<SearchResponse> => {
   try {
@@ -89,30 +140,15 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
     queryParams.append("embed", "thumbnail");
     queryParams.append("embed", "item/thumbnail");
     
-    if (params.query) {
-      queryParams.append("query", params.query);
-    }
+    if (params.query) queryParams.append("query", params.query);
+    if (params.scope) queryParams.append("scope", params.scope);
+    if (params.dsoType) queryParams.append("dsoType", params.dsoType);
     
-    if (params.scope) {
-      queryParams.append("scope", params.scope);
-    }
-    
-    if (params.dsoType) {
-      queryParams.append("dsoType", params.dsoType);
-    }
-    
-    // Add filters
     if (params.filters) {
       Object.entries(params.filters).forEach(([key, value]) => {
-        // Skip internal date range keys - handle specially
-        if (key === "dateFrom" || key === "dateTo") {
-          return;
-        }
+        if (key === "dateFrom" || key === "dateTo") return;
         queryParams.append(`f.${key}`, value);
       });
-
-      // Handle date range filter per API docs
-      // Format: f.dateIssued=[2024-01-01 TO 2024-12-31],equals
       const dateFrom = params.filters.dateFrom;
       const dateTo = params.filters.dateTo;
       if (dateFrom || dateTo) {
@@ -140,7 +176,6 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
       };
     });
 
-    // Extract facets from response
     const facetsData = response.data._embedded?.facets || [];
     const facets: FacetCategory[] = facetsData.map((facet: any) => ({
       name: facet.name,
@@ -149,6 +184,7 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
         label: v.label,
         count: v.count,
         value: v._links?.search?.href,
+        authorityKey: v.authorityKey,
       })),
       hasMore: facet._embedded?.values?.length >= (facet.facetLimit || 5),
     }));
@@ -165,14 +201,6 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
     };
   } catch (error) {
     console.error("Search error:", error);
-    const errorStatus = (error as any)?.response?.status || 500;
-    if (errorStatus === 400) window.location.href = `/error-400`;
-    else if (errorStatus === 401) window.location.href = `/error-401`;
-    else if (errorStatus === 403) window.location.href = `/error-403`;
-    else if (errorStatus === 422) window.location.href = `/error-422`;
-    else if (errorStatus === 500) window.location.href = `/error-500`;
-    else if (errorStatus !== 0) window.location.href = `/error-404`;
-    
     return {
       results: [],
       page: { size: 10, totalElements: 0, totalPages: 0, number: 0 },
@@ -182,11 +210,12 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
 
 /**
  * Fetch facet values for a specific facet
+ * GET /api/discover/facets/{facetName}
  */
 export const fetchFacetValues = async (
   facetName: string,
   params: SearchParams & { prefix?: string; facetPage?: number; facetSize?: number }
-): Promise<FacetCategory> => {
+): Promise<FacetCategory & { page?: { size: number; totalElements: number; totalPages: number; number: number } }> => {
   try {
     const queryParams = new URLSearchParams();
     
@@ -194,23 +223,11 @@ export const fetchFacetValues = async (
     queryParams.append("page", String(params.facetPage || 0));
     queryParams.append("size", String(params.facetSize || 5));
     
-    if (params.query) {
-      queryParams.append("query", params.query);
-    }
+    if (params.query) queryParams.append("query", params.query);
+    if (params.scope) queryParams.append("scope", params.scope);
+    if (params.dsoType) queryParams.append("dsoType", params.dsoType);
+    if (params.prefix) queryParams.append("prefix", params.prefix);
     
-    if (params.scope) {
-      queryParams.append("scope", params.scope);
-    }
-    
-    if (params.dsoType) {
-      queryParams.append("dsoType", params.dsoType);
-    }
-    
-    if (params.prefix) {
-      queryParams.append("prefix", params.prefix);
-    }
-    
-    // Add filters
     if (params.filters) {
       Object.entries(params.filters).forEach(([key, value]) => {
         queryParams.append(`f.${key}`, value);
@@ -219,7 +236,7 @@ export const fetchFacetValues = async (
 
     const response = await axiosInstance.get(`/api/discover/facets/${facetName}?${queryParams.toString()}`);
     
-    const values = response.data._embedded?.values || [];
+    const values = response.data._embedded?.values || response.data.values || [];
     const page = response.data.page || {};
     
     return {
@@ -229,8 +246,10 @@ export const fetchFacetValues = async (
         label: v.label,
         count: v.count,
         value: v._links?.search?.href,
+        authorityKey: v.authorityKey,
       })),
-      hasMore: page.number < page.totalPages - 1,
+      hasMore: page.number < (page.totalPages || 1) - 1,
+      page,
     };
   } catch (error) {
     console.error(`Fetch facet ${facetName} error:`, error);
@@ -251,7 +270,6 @@ export const fetchAllFacets = async (params: SearchParams): Promise<FacetCategor
     const facetPromises = siteConfig.sidebarFacets.map((facet) =>
       fetchFacetValues(facet.name, { ...params, facetSize: facet.size })
     );
-    
     return await Promise.all(facetPromises);
   } catch (error) {
     console.error("Fetch all facets error:", error);
@@ -270,10 +288,8 @@ export const fetchHasFileCounts = async (
       ...params,
       facetSize: 10
     });
-    
     const hasFileCount = facet.values.find(v => v.label === 'true')?.count || 0;
     const noFileCount = facet.values.find(v => v.label === 'false')?.count || 0;
-    
     return { hasFileCount, noFileCount };
   } catch (error) {
     console.error("Fetch has file counts error:", error);
