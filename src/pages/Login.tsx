@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Library, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import loginIllustration from "@/assets/images/login-illustration.png";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -45,23 +46,21 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-8 animate-slide-up">
-        {/* Logo */}
-        <div className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
-              <Library className="w-8 h-8 text-primary-foreground" />
-            </div>
+    <div className="min-h-screen flex">
+      {/* Left Side - Login Form */}
+      <div className="flex-1 flex items-center justify-center bg-background p-8 lg:p-12">
+        <div className="w-full max-w-md space-y-8">
+          {/* Logo and Title */}
+          <div>
+            <h1 className="text-4xl font-bold text-primary tracking-wide mb-2">
+              WELCOME
+            </h1>
+            <p className="text-muted-foreground">
+              Sign in to your DocVault account
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
-          <p className="text-muted-foreground mt-2">
-            Sign in to your DocVault account
-          </p>
-        </div>
 
-        {/* Login Form */}
-        <div className="bg-card rounded-xl border border-border p-8 shadow-lg">
+          {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
@@ -70,20 +69,24 @@ const Login = () => {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-muted-foreground text-sm">
+                Username
+              </Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="XXXXXXXXXXXXXXX"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-secondary/50"
+                className="bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 rounded-none px-0 focus-visible:ring-0 focus-visible:border-foreground"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-muted-foreground text-sm">
+                Password
+              </Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -92,12 +95,12 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="bg-secondary/50 pr-10"
+                  className="bg-transparent border-b-2 border-t-0 border-l-0 border-r-0 rounded-none px-0 pr-10 focus-visible:ring-0 focus-visible:border-foreground"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? (
                     <EyeOff className="w-4 h-4" />
@@ -119,44 +122,58 @@ const Login = () => {
                   htmlFor="remember"
                   className="text-sm text-muted-foreground cursor-pointer"
                 >
-                  Remember me
+                  Remember
                 </label>
               </div>
               <Link
                 to="/forgot-password"
-                className="text-sm text-primary hover:underline"
+                className="text-sm text-muted-foreground hover:text-foreground"
               >
-                Forgot password?
+                Forgot Password?
               </Link>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-[#FFD93D] hover:bg-[#FFD93D]/90 text-foreground font-semibold h-12 rounded-lg" 
+              disabled={loading}
+            >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                <>
-                  Login →
-                </>
+                "SUBMIT"
               )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="text-center">
             <p className="text-sm text-muted-foreground">
               Don't have an account?{" "}
-              <Link to="/signUp" className="text-primary hover:underline">
+              <Link to="/signUp" className="text-primary hover:underline font-medium">
                 Create account
               </Link>
             </p>
           </div>
         </div>
-
       </div>
+
+      {/* Right Side - Image */}
+      <div className="hidden lg:flex flex-1 items-center justify-center bg-blue-500 relative">
+          <div className="max-w-l w-full h-auto overflow-hidden">
+        <img 
+          src={loginIllustration} 
+          alt="Login Illustration" 
+          className="w-full h-auto object-contain"
+        />
+          </div>
+        </div>
     </div>
   );
 };
 
 export default Login;
+
+
