@@ -5,6 +5,7 @@
 
 import axiosInstance from "./axiosInstance";
 import { siteConfig } from "@/config/siteConfig";
+import { setupCollectionPermissions } from "./collectionPermissionsApi";
 
 export interface Collection {
   id: string;
@@ -89,14 +90,26 @@ export const fetchCollectionById = async (id: string): Promise<Collection | null
 };
 
 /**
- * Create a new collection under a community
+ * Create a new collection under a community with automatic group creation
+ * 
+ * This function:
+ * 1. Creates the collection resource
+ * 2. Waits for backend indexing
+ * 3. Automatically creates three permission groups:
+ *    - {CollectionName}_Read
+ *    - {CollectionName}_Admin
+ *    - {CollectionName}_Upload
+ * 4. Creates default resource policies linking groups to actions
  */
 export const createCollection = async (
   parentId: string,
   metadata: Record<string, Array<{ value: string; language?: string }>>,
-  name?: string
+  name?: string,
+  autoCreateGroups: boolean = true
 ): Promise<Collection | null> => {
   try {
+    console.log("[Collection] Creating new collection", { parentId, name });
+
     const payload: any = {
       metadata,
       type: "collection",
@@ -111,7 +124,7 @@ export const createCollection = async (
       payload
     );
     
-    return {
+    const collection: Collection = {
       id: response.data.id,
       uuid: response.data.uuid || response.data.id,
       name: response.data.name,
@@ -119,6 +132,57 @@ export const createCollection = async (
       metadata: response.data.metadata || {},
       type: response.data.type,
     };
+
+    console.log("[Collection] Collection created successfully", collection);
+
+    // Step 2: Auto-create permission groups if enabled
+    if (autoCreateGroups) {
+      console.log("[Collection] Starting automatic permission group creation");
+
+      // Extract collection title for group naming
+      const collectionTitle = 
+        metadata["dc.title"]?.[0]?.value || 
+        collection.name || 
+        `Collection_${collection.id.substring(0, 8)}`;
+
+      const collectionDescription = metadata["dc.description"]?.[0]?.value;
+
+      // Wait for collection to be fully indexed before creating groups
+      // This prevents race conditions in the backend
+      setTimeout(async () => {
+        try {
+          const permissionResult = await setupCollectionPermissions(
+            collection.id,
+            collectionTitle,
+            collectionDescription
+          );
+
+          if (permissionResult.success) {
+            console.log(
+              "[Collection] Permission groups and policies created successfully",
+              {
+                groupIds: permissionResult.groupIds,
+                policyIds: permissionResult.policyIds,
+              }
+            );
+          } else {
+            console.warn(
+              "[Collection] Permission setup completed with errors",
+              {
+                errors: permissionResult.errors,
+              }
+            );
+          }
+        } catch (permissionError: any) {
+          console.error(
+            "[Collection] Failed to create permission groups and policies",
+            permissionError
+          );
+        }
+      }, 1000); // Wait 1 second for backend indexing
+    }
+
+    return collection;
   } catch (error) {
     console.error("Create collection error:", error);
     return null;

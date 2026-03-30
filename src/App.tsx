@@ -37,6 +37,7 @@ import Policies from "./pages/Policies";
 import ResourcePolicy from "./pages/ResourcePolicy";
 import CreateResourcePolicy from "./pages/CreateResourcePolicy";
 import CreatePolicy from "./pages/CreatePolicy";
+import AssignRole from "./pages/AssignRole";
 
 const queryClient = new QueryClient();
 
@@ -245,6 +246,14 @@ const App = () => (
               element={
                 <ProtectedRoute adminOnly>
                   <CreateResourcePolicy />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/assignRole/:id"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AssignRole />
                 </ProtectedRoute>
               }
             />

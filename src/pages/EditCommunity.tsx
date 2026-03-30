@@ -28,6 +28,7 @@ import {
   Save,
   X,
   Shield,
+  Lock,
   Plus,
   Loader2,
   FolderTree,
@@ -705,8 +706,11 @@ const EditCommunity = () => {
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteClick({ type: "collection", uuid: col.uuid, parentUuid: sub.uuid, name: getTitle(col) })}>
                                           <Trash2 className="h-4 w-4 text-destructive" />
                                         </Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/policies/collection/${col.uuid}`)}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/policies/collection/${col.uuid}`)} title="Access policies">
                                           <Shield className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/assignRole/${col.uuid}`)} title="Assign workflow roles">
+                                          <Lock className="h-4 w-4" />
                                         </Button>
                                       </>
                                     )}
@@ -760,8 +764,11 @@ const EditCommunity = () => {
                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteClick({ type: "collection", uuid: col.uuid, parentUuid: community.uuid, name: getTitle(col) })}>
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/policies/collection/${col.uuid}`)}>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/policies/collection/${col.uuid}`)} title="Access policies">
                                     <Shield className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate(`/assignRole/${col.uuid}`)} title="Assign workflow roles">
+                                    <Lock className="h-4 w-4" />
                                   </Button>
                                 </>
                               )}

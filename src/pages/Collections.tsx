@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Folder, Plus, FolderOpen, ChevronDown, ChevronRight, Loader2, Search as SearchIcon } from "lucide-react";
+import { Folder, Plus, FolderOpen, ChevronDown, ChevronRight, Loader2, Search as SearchIcon, Settings, Shield, Lock } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +35,6 @@ const Collections = () => {
       setCollections(result.collections);
       const grouped = groupCollectionsByCategory(result.collections);
       setCategoryGroups(grouped);
-      // Expand all categories by default
       setExpandedCategories(Array.from(grouped.keys()));
     } catch (error) {
       console.error("Failed to load collections:", error);
@@ -59,6 +58,16 @@ const Collections = () => {
 
   const handleCollectionClick = (collectionId: string) => {
     navigate(`/search?scope=${collectionId}`);
+  };
+
+  const handleAssignRole = (e: React.MouseEvent, collection: Collection) => {
+    e.stopPropagation();
+    navigate(`/assignRole/${collection.id}`);
+  };
+
+  const handleAccessPolicy = (e: React.MouseEvent, collection: Collection) => {
+    e.stopPropagation();
+    navigate(`/policies/collection/${collection.id}`);
   };
 
   const getDescription = (col: Collection): string => {
@@ -162,29 +171,58 @@ const Collections = () => {
                       {filteredCols.map((collection) => (
                         <div
                           key={collection.id}
-                          className="group relative bg-card rounded-lg border border-border p-4 hover:shadow-lg hover:border-primary/50 transition-all duration-200 cursor-pointer overflow-hidden"
-                          onClick={() => handleCollectionClick(collection.id)}
+                          className="relative bg-card rounded-lg border border-border p-4 hover:shadow-lg hover:border-primary/50 transition-all duration-200 overflow-hidden"
                         >
                           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-50" />
                           
-                          <div className="relative z-10">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                          <div className="relative z-10 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <div 
+                                className="flex-1 cursor-pointer"
+                                onClick={() => handleCollectionClick(collection.id)}
+                              >
+                                <h3 className="font-semibold text-foreground hover:text-primary transition-colors">
                                   {getSubcollectionName(collection.name)}
                                 </h3>
                                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                   {getDescription(collection)}
                                 </p>
                               </div>
-                              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-1" />
                             </div>
 
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-                              <div className="flex items-center gap-1">
+                            <div className="flex items-center justify-between pt-2 border-t border-border">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Folder className="w-3 h-3" />
                                 <span>{collection.archivedItemsCount || 0} items</span>
                               </div>
+                            </div>
+
+                            {/* Action Buttons - Always show for admin users */}
+                            <div className="flex gap-2 pt-2">
+                              {isAdmin && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => handleAssignRole(e, collection)}
+                                    title="Assign workflow roles"
+                                    className="flex-1 h-8 text-xs"
+                                  >
+                                    <Shield className="w-3 h-3 mr-1" />
+                                    Assign Role
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={(e) => handleAccessPolicy(e, collection)}
+                                    title="Manage access policy"
+                                    className="flex-1 h-8 text-xs"
+                                  >
+                                    <Lock className="w-3 h-3 mr-1" />
+                                    Access Policy
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
