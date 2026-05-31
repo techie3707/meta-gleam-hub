@@ -15,22 +15,15 @@ import {
   Users,
   GitBranch,
   LogOut,
-  ChevronDown,
   Activity,
   Database,
-  FolderTree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSidebarContext } from "./AppLayout";
 import { siteConfig } from "@/config/siteConfig";
-import { fetchCollections, groupCollectionsByCategory, Collection } from "@/api/collectionApi";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { fetchCollections, Collection } from "@/api/collectionApi";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -45,14 +38,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Settings,
   Activity,
   Database,
-  FolderTree,
 };
 
 export function AppSidebar() {
   const { collapsed, setCollapsed } = useSidebarContext();
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [categoryGroups, setCategoryGroups] = useState<Map<string, Collection[]>>(new Map());
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const location = useLocation();
   const { isAdmin, logout, isAuthenticated } = useAuth();
 
@@ -65,19 +55,12 @@ export function AppSidebar() {
   const loadCollections = async () => {
     try {
       const result = await fetchCollections(0, 100);
+      console.log("Fetched collections for sidebar:", result.collections);
       setCollections(result.collections);
-      setCategoryGroups(groupCollectionsByCategory(result.collections));
     } catch (error) {
-      console.error("Failed to load collections:", error);
+      console.error("Failed to load collections for sidebar:", error);
+      setCollections([]);
     }
-  };
-
-  const toggleCategory = (category: string) => {
-    setExpandedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
-    );
   };
 
   const handleLogout = async () => {
@@ -143,45 +126,23 @@ export function AppSidebar() {
           );
         })}
 
-        {/* Collections Section */}
-        {!collapsed && categoryGroups.size > 0 && (
+        {/* Collections Section - Flattened */}
+        {!collapsed && collections.length > 0 && (
           <div className="pt-4">
             <div className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
               Collections
             </div>
-            {Array.from(categoryGroups.entries()).map(([category, cols]) => (
-              <Collapsible
-                key={category}
-                open={expandedCategories.includes(category)}
-                onOpenChange={() => toggleCategory(category)}
+            {collections.map((col) => (
+              <NavLink
+                key={col.id || col.uuid}
+                to={`/search?scope=${col.id || col.uuid}`}
+                className={cn(
+                  "sidebar-item text-sm py-2",
+                  location.search.includes(col.id || col.uuid || "") && "sidebar-item-active"
+                )}
               >
-                <CollapsibleTrigger className="sidebar-item w-full justify-between">
-                  <div className="flex items-center gap-3">
-                    <FolderOpen className="w-5 h-5 flex-shrink-0" />
-                    <span>{category}</span>
-                  </div>
-                  <ChevronDown
-                    className={cn(
-                      "w-4 h-4 transition-transform",
-                      expandedCategories.includes(category) && "rotate-180"
-                    )}
-                  />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pl-8 space-y-1">
-                  {cols.map((col) => (
-                    <NavLink
-                      key={col.id}
-                      to={`/search?scope=${col.id}`}
-                      className={cn(
-                        "sidebar-item text-sm py-2",
-                        location.search.includes(col.id) && "sidebar-item-active"
-                      )}
-                    >
-                      <span className="truncate">{col.name.split("_").slice(1).join(" ") || col.name}</span>
-                    </NavLink>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
+                <span className="truncate">{col.name}</span>
+              </NavLink>
             ))}
           </div>
         )}

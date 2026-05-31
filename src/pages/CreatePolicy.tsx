@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Search, ArrowLeft } from "lucide-react";
+import { Search, ArrowLeft, Info } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import {
   getResourcePolicies,
@@ -34,7 +35,6 @@ import {
   updateResourcePolicyMetadata,
   ResourcePolicyData,
   ACTION_TYPES,
-  POLICY_TYPES,
 } from "@/api/policyApi";
 import { fetchGroups, Group } from "@/api/groupApi";
 
@@ -46,7 +46,6 @@ const CreatePolicy = () => {
 
   // Form state
   const [formData, setFormData] = useState<ResourcePolicyData>({
-    policyType: "",
     action: "",
     type: { value: "resourcepolicy" },
   });
@@ -92,7 +91,6 @@ const CreatePolicy = () => {
 
       if (policy) {
         const policyData = {
-          policyType: policy.policyType || "",
           action: policy.action,
           type: { value: "resourcepolicy" },
         };
@@ -180,8 +178,7 @@ const CreatePolicy = () => {
         // Update mode
         const needsGroupUpdate = selectedGroup !== originalGroup;
         const needsMetadataUpdate =
-          formData.action !== originalPolicyData?.action ||
-          formData.policyType !== originalPolicyData?.policyType;
+          formData.action !== originalPolicyData?.action;
 
         if (needsGroupUpdate && needsMetadataUpdate) {
           await updateResourcePolicyGroup(policyId, selectedGroup);
@@ -247,58 +244,37 @@ const CreatePolicy = () => {
             <CardTitle>Policy Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* Action */}
-              <div className="space-y-2">
-                <Label htmlFor="action" className="text-sm font-medium">
-                  Action <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={formData.action}
-                  onValueChange={(value) => handleSelectChange("action", value)}
-                >
-                  <SelectTrigger id="action" className="w-full">
-                    <SelectValue placeholder="Select the action" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ACTION_TYPES.map((action) => (
-                      <SelectItem key={action.id} value={action.id}>
-                        {action.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Permission level to grant (READ, WRITE, ADMIN, etc.)
-                </p>
-              </div>
-
-              {/* Policy Type (Optional) */}
-              <div className="space-y-2">
-                <Label htmlFor="policyType" className="text-sm font-medium">
-                  Policy Type
-                </Label>
-                <Select
-                  value={formData.policyType}
-                  onValueChange={(value) =>
-                    handleSelectChange("policyType", value)
-                  }
-                >
-                  <SelectTrigger id="policyType" className="w-full">
-                    <SelectValue placeholder="Select policy type (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {POLICY_TYPES.map((type) => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Optional: Categorize the policy type
-                </p>
-              </div>
+            {/* Info Alert */}
+            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="ml-2">
+                <strong>Collection-Wise Permissions:</strong> When a collection is created, three permission groups are automatically generated. 
+                Use one of those groups here to grant permissions. Available groups: {selectedGroupName ? `${selectedGroupName} (Selected)` : "Select a group below"}
+              </AlertDescription>
+            </Alert>
+            {/* Action */}
+            <div className="space-y-2">
+              <Label htmlFor="action" className="text-sm font-medium">
+                Action <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.action}
+                onValueChange={(value) => handleSelectChange("action", value)}
+              >
+                <SelectTrigger id="action" className="w-full">
+                  <SelectValue placeholder="Select the action" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTION_TYPES.map((action) => (
+                    <SelectItem key={action.id} value={action.id}>
+                      {action.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Permission level to grant (READ, WRITE, ADMIN, etc.)
+              </p>
             </div>
 
             {/* Selected Group Display */}

@@ -103,12 +103,6 @@ const Collections = () => {
               Explore repository collections organized by category
             </p>
           </div>
-          {isAdmin && (
-            <Button onClick={() => navigate("/collections/create")}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Collection
-            </Button>
-          )}
         </div>
 
         {/* Search */}
@@ -238,16 +232,7 @@ const Collections = () => {
             <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
               <Folder className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg font-medium">No collections found</p>
-              <p className="text-sm mt-2">Create your first collection to get started</p>
-              {isAdmin && (
-                <Button
-                  onClick={() => navigate("/collections/create")}
-                  className="mt-4"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Collection
-                </Button>
-              )}
+              <p className="text-sm mt-2">No collections available at this time</p>
             </div>
           )}
         </div>

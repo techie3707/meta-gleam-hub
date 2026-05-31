@@ -1,107 +1,155 @@
 /**
- * Cart API
- * Handles shopping cart operations for items
+ * Cart API - User Metadata Based
+ * Handles shopping cart operations using eperson.cart metadata
+ * Cart items stored as: itemUUID_bitstreamUUID_dateAdded_pageRange
  */
 
 import axiosInstance from "./axiosInstance";
+import { siteConfig } from "@/config/siteConfig";
 
-export interface CartItem {
-  id: string;
+export interface CartItemInfo {
+  fullValue: string;
   itemId: string;
-  itemName: string;
-  addedAt: string;
-}
-
-export interface Cart {
-  id: string;
-  items: CartItem[];
-  totalItems: number;
+  bitstreamId: string;
+  date: string;
+  pages: string | null;
+  name?: string; // Document title/name
 }
 
 /**
- * Get current user's cart
+ * Add item to user's cart via eperson metadata
+ * Format: itemUUID_bitstreamUUID_YYYY-MM-DD_pageRange
  */
-export const getCart = async (): Promise<Cart | null> => {
-  try {
-    const response = await axiosInstance.get("/api/cart");
-    return {
-      id: response.data.id,
-      items: response.data._embedded?.items || [],
-      totalItems: response.data._embedded?.items?.length || 0,
-    };
-  } catch (error) {
-    console.error("Get cart error:", error);
-    return null;
-  }
-};
+export const updateUserCart = async (
+  userId: string,
+  bitstreamId: string,
+  itemId?: string,
+  pageRange?: string
+): Promise<void> => {
+  const authToken = localStorage.getItem(siteConfig.auth.tokenKey) || "";
+  const csrfToken = localStorage.getItem("csrfToken") || "";
 
-/**
- * Add item to cart
- */
-export const addToCart = async (itemId: string): Promise<boolean> => {
+  // Format: itemUUID_bitstreamUUID_dateAdded_pageRange
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const cartValue = itemId
+    ? `${itemId}_${bitstreamId}_${today}_${pageRange || ""}`
+    : `${bitstreamId}_${today}_${pageRange || ""}`;
+
+  const payload = [
+    {
+      op: "add",
+      path: "/metadata/eperson.cart",
+      value: cartValue,
+    },
+  ];
+
   try {
-    await axiosInstance.post(
-      "/api/cart/items",
-      `${axiosInstance.defaults.baseURL}/api/core/items/${itemId}`,
+    await axiosInstance.patch(
+      `/api/eperson/epersons/${userId}`,
+      payload,
       {
         headers: {
-          "Content-Type": "text/uri-list",
+          "Content-Type": "application/json",
+          "X-XSRF-TOKEN": csrfToken,
+          Authorization: `Bearer ${authToken}`,
         },
+        withCredentials: true,
       }
     );
-    return true;
   } catch (error) {
-    console.error("Add to cart error:", error);
-    return false;
-  }
-};
-
-/**
- * Remove item from cart
- */
-export const removeFromCart = async (cartItemId: string): Promise<boolean> => {
-  try {
-    await axiosInstance.delete(`/api/cart/items/${cartItemId}`);
-    return true;
-  } catch (error) {
-    console.error("Remove from cart error:", error);
-    return false;
-  }
-};
-
-/**
- * Clear all items from cart
- */
-export const clearCart = async (): Promise<boolean> => {
-  try {
-    await axiosInstance.delete("/api/cart/items");
-    return true;
-  } catch (error) {
-    console.error("Clear cart error:", error);
-    return false;
-  }
-};
-
-/**
- * Download all items in cart as ZIP
- */
-export const downloadCartAsZip = async (): Promise<void> => {
-  try {
-    const response = await axiosInstance.get("/api/cart/download", {
-      responseType: "blob",
-    });
-
-    const blob = new Blob([response.data], { type: "application/zip" });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "cart-download.zip";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error("Download cart error:", error);
+    console.error("Failed to add item to cart:", error);
     throw error;
   }
+};
+
+/**
+ * Remove item from user's cart
+ */
+export const removeFromCart = async (
+  userId: string,
+  cartItemValue: string
+): Promise<void> => {
+  const authToken = localStorage.getItem(siteConfig.auth.tokenKey) || "";
+  const csrfToken = localStorage.getItem("csrfToken") || "";
+
+  const payload = [
+    {
+      op: "remove",
+      path: "/metadata/eperson.cart",
+      value: cartItemValue,
+    },
+  ];
+
+  try {
+    await axiosInstance.patch(
+      `/api/eperson/epersons/${userId}`,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-XSRF-TOKEN": csrfToken,
+          Authorization: `Bearer ${authToken}`,
+        },
+        withCredentials: true,
+      }
+    );
+  } catch (error) {
+    console.error("Failed to remove item from cart:", error);
+    throw error;
+  }
+};
+
+/**
+ * Clear entire user cart
+ */
+export const clearUserCart = async (userId: string): Promise<void> => {
+  const authToken = localStorage.getItem(siteConfig.auth.tokenKey) || "";
+  const csrfToken = localStorage.getItem("csrfToken") || "";
+
+  const payload = [
+    {
+      op: "remove",
+      path: "/metadata/eperson.cart",
+    },
+  ];
+
+  try {
+    await axiosInstance.patch(
+      `/api/eperson/epersons/${userId}`,
+      payload,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-XSRF-TOKEN": csrfToken,
+          Authorization: `Bearer ${authToken}`,
+        },
+        withCredentials: true,
+      }
+    );
+  } catch (error) {
+    console.error("Failed to clear cart:", error);
+    throw error;
+  }
+};
+
+/**
+ * Parse cart item format: itemId_bitstreamId_date_pages
+ */
+export const parseCartItem = (raw: string): CartItemInfo | null => {
+  // Parse: UUID_UUID_YYYY-MM-DD_pageRange (pageRange optional)
+  const match = raw.match(
+    /^([a-f0-9-]{36})_([a-f0-9-]{36})_([\d]{4}-[\d]{2}-[\d]{2})_(.*)$/i
+  );
+
+  if (match) {
+    return {
+      fullValue: raw,
+      itemId: match[1],
+      bitstreamId: match[2],
+      date: match[3],
+      pages: match[4] || null,
+    };
+  }
+
+  return null;
 };

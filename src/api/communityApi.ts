@@ -13,6 +13,7 @@ export interface Community {
   metadata: Record<string, Array<{ value: string }>>;
   type: string;
   archivedItemsCount?: number;
+  collections?: Array<{ id: string; name: string }>;
 }
 
 export interface CommunityListResponse {

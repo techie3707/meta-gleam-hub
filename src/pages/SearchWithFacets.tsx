@@ -338,6 +338,15 @@ const SearchWithFacets = () => {
   const getThumbnailUrl = (result: SearchResult) => result.thumbnail?.href || null;
   const getMetadataValue = (result: SearchResult, field: string) =>
     result.metadata?.[field]?.[0]?.value || "";
+  
+  const getTitleFromResult = (result: SearchResult) =>
+    result.metadata?.["dc.title"]?.[0]?.value ||
+    result.metadata?.["dc.DocNumber"]?.[0]?.value ||
+    result.metadata?.["dc.assetid"]?.[0]?.value ||
+    result.metadata?.["dc.empid"]?.[0]?.value ||
+    result.metadata?.["dc.ContractOwner"]?.[0]?.value ||
+    result.name ||
+    "Untitled";
 
   const handleResultClick = (result: SearchResult) => navigate(`/documents/${result.uuid}`);
 
@@ -625,7 +634,7 @@ const SearchWithFacets = () => {
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {results.map((result) => {
-                    const title = result.name || getMetadataValue(result, "dc.title") || "Untitled";
+                    const title = getTitleFromResult(result);
                     const author = getMetadataValue(result, "dc.contributor.author") || "Unknown Author";
                     const dateIssued = getMetadataValue(result, "dc.date.issued");
                     const description =

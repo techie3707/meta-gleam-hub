@@ -5,13 +5,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Search, ArrowLeft, Users, UserCircle } from "lucide-react";
+import { Search, ArrowLeft } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -27,16 +26,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
-  createResourcePolicyForEPerson,
   createResourcePolicyForGroup,
   ResourcePolicyData,
   ACTION_TYPES,
-  POLICY_TYPES,
 } from "@/api/policyApi";
-import { fetchUsers, EPerson } from "@/api/userApi";
 import { fetchGroups, Group } from "@/api/groupApi";
 
 const CreateResourcePolicy = () => {
@@ -45,27 +40,13 @@ const CreateResourcePolicy = () => {
 
   // Form state
   const [formData, setFormData] = useState<ResourcePolicyData>({
-    name: "",
-    description: null,
-    policyType: "",
     action: "",
-    startDate: null,
-    endDate: null,
     type: { value: "resourcepolicy" },
   });
 
-  // Selection state
-  const [selectedEperson, setSelectedEperson] = useState<string>("");
-  const [selectedEpersonName, setSelectedEpersonName] = useState<string>("");
+  // Group selection state
   const [selectedGroup, setSelectedGroup] = useState<string>("");
   const [selectedGroupName, setSelectedGroupName] = useState<string>("");
-
-  // Users state
-  const [users, setUsers] = useState<EPerson[]>([]);
-  const [userSearchQuery, setUserSearchQuery] = useState<string>("");
-  const [userLoading, setUserLoading] = useState<boolean>(false);
-  const [userPage, setUserPage] = useState<number>(1);
-  const [userTotalPages, setUserTotalPages] = useState<number>(1);
 
   // Groups state
   const [groups, setGroups] = useState<Group[]>([]);
@@ -75,40 +56,11 @@ const CreateResourcePolicy = () => {
   const [groupTotalPages, setGroupTotalPages] = useState<number>(1);
 
   const size = 10;
-  const [activeTab, setActiveTab] = useState<"eperson" | "group">("eperson");
 
-  // Load users on mount
+  // Load groups on mount
   useEffect(() => {
-    if (activeTab === "eperson") {
-      loadUsers(userPage, size, userSearchQuery);
-    }
-  }, [userPage, activeTab]);
-
-  // Load groups when tab changes
-  useEffect(() => {
-    if (activeTab === "group") {
-      loadGroups(groupPage, size, groupSearchQuery);
-    }
-  }, [groupPage, activeTab]);
-
-  // Load users with pagination and search
-  const loadUsers = async (page: number, size: number, query: string) => {
-    setUserLoading(true);
-    try {
-      const data = await fetchUsers(page - 1, size, query);
-      setUsers(data.epersons);
-      setUserTotalPages(data.page.totalPages);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load users",
-        variant: "destructive",
-      });
-    } finally {
-      setUserLoading(false);
-    }
-  };
+    loadGroups(groupPage, size, groupSearchQuery);
+  }, [groupPage]);
 
   // Load groups with pagination and search
   const loadGroups = async (page: number, size: number, query: string) => {
@@ -129,27 +81,10 @@ const CreateResourcePolicy = () => {
     }
   };
 
-  // Handle user search
-  const handleUserSearch = () => {
-    setUserPage(1);
-    loadUsers(1, size, userSearchQuery);
-  };
-
   // Handle group search
   const handleGroupSearch = () => {
     setGroupPage(1);
     loadGroups(1, size, groupSearchQuery);
-  };
-
-  // Handle form field changes
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -159,27 +94,10 @@ const CreateResourcePolicy = () => {
     }));
   };
 
-  // Handle EPerson selection
-  const handleSelectEperson = (eperson: EPerson) => {
-    setSelectedEperson(eperson.uuid);
-    const firstName =
-      eperson.metadata["eperson.firstname"]?.[0]?.value || "";
-    const lastName =
-      eperson.metadata["eperson.lastname"]?.[0]?.value || "";
-    const name = `${firstName} ${lastName}`.trim() || eperson.email;
-    setSelectedEpersonName(name);
-    // Clear group selection
-    setSelectedGroup("");
-    setSelectedGroupName("");
-  };
-
   // Handle Group selection
   const handleSelectGroup = (group: Group) => {
     setSelectedGroup(group.uuid);
     setSelectedGroupName(group.name);
-    // Clear EPerson selection
-    setSelectedEperson("");
-    setSelectedEpersonName("");
   };
 
   // Submit form
@@ -193,10 +111,10 @@ const CreateResourcePolicy = () => {
       return;
     }
 
-    if (!selectedEperson && !selectedGroup) {
+    if (!selectedGroup) {
       toast({
         title: "Validation Error",
-        description: "Please select either an EPerson or a Group",
+        description: "Please select a group",
         variant: "destructive",
       });
       return;
@@ -212,11 +130,7 @@ const CreateResourcePolicy = () => {
     }
 
     try {
-      if (selectedEperson) {
-        await createResourcePolicyForEPerson(uuid, selectedEperson, formData);
-      } else if (selectedGroup) {
-        await createResourcePolicyForGroup(uuid, selectedGroup, formData);
-      }
+      await createResourcePolicyForGroup(uuid, selectedGroup, formData);
 
       toast({
         title: "Success",
@@ -232,15 +146,6 @@ const CreateResourcePolicy = () => {
         variant: "destructive",
       });
     }
-  };
-
-  // Get EPerson display name
-  const getEpersonName = (eperson: EPerson): string => {
-    const firstName =
-      eperson.metadata["eperson.firstname"]?.[0]?.value || "";
-    const lastName =
-      eperson.metadata["eperson.lastname"]?.[0]?.value || "";
-    return `${firstName} ${lastName}`.trim() || eperson.email;
   };
 
   return (
@@ -260,69 +165,22 @@ const CreateResourcePolicy = () => {
             Create New Resource Policy
           </h1>
           <p className="text-muted-foreground mt-1">
-            Grant permissions to a user or group
+            Grant permissions to a group
           </p>
         </div>
 
-        {/* Form */}
+        {/* Action Field */}
         <Card>
           <CardHeader>
-            <CardTitle>Policy Details</CardTitle>
+            <CardTitle>Action</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                value={formData.name || ""}
-                onChange={handleInputChange}
-                placeholder="Enter policy name"
-              />
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                value={formData.description || ""}
-                onChange={handleInputChange}
-                placeholder="Enter policy description"
-                rows={3}
-              />
-            </div>
-
-            {/* Policy Type */}
-            <div className="space-y-2">
-              <Label htmlFor="policyType">Policy Type *</Label>
-              <Select
-                value={formData.policyType}
-                onValueChange={(value) =>
-                  handleSelectChange("policyType", value)
-                }
-              >
-                <SelectTrigger id="policyType">
-                  <SelectValue placeholder="Select the policy type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {POLICY_TYPES.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Action */}
             <div className="space-y-2">
               <Label htmlFor="action">Action *</Label>
               <Select
                 value={formData.action}
-                onValueChange={(value) => handleSelectChange("action", value)}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, action: value }))}
               >
                 <SelectTrigger id="action">
                   <SelectValue placeholder="Select the action" />
@@ -335,138 +193,19 @@ const CreateResourcePolicy = () => {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Selected Assignee Display */}
-            <div className="space-y-2">
-              <Label>Selected Assignee</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={selectedEpersonName || selectedGroupName}
-                  readOnly
-                  placeholder="No assignee selected"
-                />
-                {selectedEperson && (
-                  <span className="flex items-center px-3 py-2 bg-primary/10 text-primary rounded text-sm">
-                    <UserCircle className="w-4 h-4 mr-1" />
-                    EPerson
-                  </span>
-                )}
-                {selectedGroup && (
-                  <span className="flex items-center px-3 py-2 bg-secondary text-secondary-foreground rounded text-sm">
-                    <Users className="w-4 h-4 mr-1" />
-                    Group
-                  </span>
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Permission level to grant (READ, WRITE, ADMIN, etc.)
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Assignee Selection */}
+        {/* Group Selection */}
         <Card>
           <CardHeader>
-            <CardTitle>Select Assignee</CardTitle>
+            <CardTitle>Select Group</CardTitle>
           </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "eperson" | "group")}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="eperson">
-                  <UserCircle className="w-4 h-4 mr-2" />
-                  Search for EPerson
-                </TabsTrigger>
-                <TabsTrigger value="group">
-                  <Users className="w-4 h-4 mr-2" />
-                  Search for Group
-                </TabsTrigger>
-              </TabsList>
-
-              {/* EPerson Tab */}
-              <TabsContent value="eperson" className="space-y-4">
-                {/* Search */}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Search users by name or email..."
-                    value={userSearchQuery}
-                    onChange={(e) => setUserSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleUserSearch()}
-                  />
-                  <Button onClick={handleUserSearch}>
-                    <Search className="w-4 h-4 mr-2" />
-                    Search
-                  </Button>
-                </div>
-
-                {/* Users Table */}
-                {userLoading ? (
-                  <div className="text-center py-8">Loading users...</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.uuid}>
-                          <TableCell className="font-mono text-sm">
-                            {user.uuid}
-                          </TableCell>
-                          <TableCell>{getEpersonName(user)}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant={
-                                selectedEperson === user.uuid
-                                  ? "default"
-                                  : "outline"
-                              }
-                              size="sm"
-                              onClick={() => handleSelectEperson(user)}
-                            >
-                              {selectedEperson === user.uuid
-                                ? "Selected"
-                                : "Select"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
-
-                {/* Pagination */}
-                {userTotalPages > 1 && (
-                  <div className="flex justify-center gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setUserPage((p) => Math.max(1, p - 1))}
-                      disabled={userPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-4">
-                      Page {userPage} of {userTotalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setUserPage((p) => Math.min(userTotalPages, p + 1))
-                      }
-                      disabled={userPage >= userTotalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Group Tab */}
-              <TabsContent value="group" className="space-y-4">
+          <CardContent className="space-y-4">
                 {/* Search */}
                 <div className="flex gap-2">
                   <Input
@@ -481,72 +220,70 @@ const CreateResourcePolicy = () => {
                   </Button>
                 </div>
 
-                {/* Groups Table */}
-                {groupLoading ? (
-                  <div className="text-center py-8">Loading groups...</div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {groups.map((group) => (
-                        <TableRow key={group.uuid}>
-                          <TableCell className="font-mono text-sm">
-                            {group.uuid}
-                          </TableCell>
-                          <TableCell>{group.name}</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant={
-                                selectedGroup === group.uuid
-                                  ? "default"
-                                  : "outline"
-                              }
-                              size="sm"
-                              onClick={() => handleSelectGroup(group)}
-                            >
-                              {selectedGroup === group.uuid
-                                ? "Selected"
-                                : "Select"}
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+            {/* Groups Table */}
+            {groupLoading ? (
+              <div className="text-center py-8">Loading groups...</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groups.map((group) => (
+                    <TableRow key={group.uuid}>
+                      <TableCell className="font-mono text-sm">
+                        {group.uuid}
+                      </TableCell>
+                      <TableCell>{group.name}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant={
+                            selectedGroup === group.uuid
+                              ? "default"
+                              : "outline"
+                          }
+                          size="sm"
+                          onClick={() => handleSelectGroup(group)}
+                        >
+                          {selectedGroup === group.uuid
+                            ? "Selected"
+                            : "Select"}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
 
-                {/* Pagination */}
-                {groupTotalPages > 1 && (
-                  <div className="flex justify-center gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={() => setGroupPage((p) => Math.max(1, p - 1))}
-                      disabled={groupPage === 1}
-                    >
-                      Previous
-                    </Button>
-                    <span className="flex items-center px-4">
-                      Page {groupPage} of {groupTotalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        setGroupPage((p) => Math.min(groupTotalPages, p + 1))
-                      }
-                      disabled={groupPage >= groupTotalPages}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            {/* Pagination */}
+            {groupTotalPages > 1 && (
+              <div className="flex justify-center gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setGroupPage((p) => Math.max(1, p - 1))}
+                  disabled={groupPage === 1}
+                >
+                  Previous
+                </Button>
+                <span className="flex items-center px-4">
+                  Page {groupPage} of {groupTotalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setGroupPage((p) => Math.min(groupTotalPages, p + 1))
+                  }
+                  disabled={groupPage >= groupTotalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -557,11 +294,7 @@ const CreateResourcePolicy = () => {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={
-              !formData.action ||
-              !formData.policyType ||
-              (!selectedEperson && !selectedGroup)
-            }
+            disabled={!formData.action || !selectedGroup}
           >
             Create Resource Policy
           </Button>

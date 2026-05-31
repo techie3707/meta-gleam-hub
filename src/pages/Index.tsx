@@ -29,7 +29,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { fetchCollections, groupCollectionsByCategory, Collection } from "@/api/collectionApi";
+import { fetchCollections, groupCollectionsByCategoryWithCommunities, Collection } from "@/api/collectionApi";
+import { fetchCommunities, fetchCommunityCollections } from "@/api/communityApi";
 import { searchRepository } from "@/api/discoveryApi";
 import { getSystemStatus, getCurrentUserInfo } from "@/api/healthApi";
 
@@ -63,17 +64,36 @@ const Index = () => {
       // Load all data in parallel
       const [
         collectionsResult,
+        communitiesResult,
         itemsResponse,
         healthStatus,
       ] = await Promise.all([
         fetchCollections(0, 100).catch(() => ({ collections: [], page: { totalElements: 0, totalPages: 0, size: 100, number: 0 } })),
+        fetchCommunities(0, 100).catch(() => ({ communities: [] })),
         searchRepository({ size: 1 }).catch(() => ({ _embedded: { searchResult: { page: { totalElements: 0 } } } })),
         getSystemStatus().catch(() => ({ overall: "UNKNOWN" as const, components: [] })),
       ]);
 
+      // Build community map: collection_id -> community_name
+      const communityMap = new Map<string, string>();
+      const communitiesWithDetails = await Promise.all(
+        communitiesResult.communities.map(async (community) => {
+          try {
+            const collections = await fetchCommunityCollections(community.id);
+            collections.forEach((col: any) => {
+              communityMap.set(col.id || col.uuid, community.name);
+            });
+            return community;
+          } catch (error) {
+            console.error(`Failed to fetch collections for community ${community.id}:`, error);
+            return community;
+          }
+        })
+      );
+
       // Set collections
       setCollections(collectionsResult.collections);
-      const grouped = groupCollectionsByCategory(collectionsResult.collections);
+      const grouped = groupCollectionsByCategoryWithCommunities(collectionsResult.collections, communityMap);
       setCategoryGroups(grouped);
       // Expand all categories by default
       setExpandedCategories(Array.from(grouped.keys()));
@@ -150,14 +170,7 @@ const Index = () => {
       icon: FolderOpen,
       iconColor: "text-document-word",
     },
-    {
-      title: "System Health",
-      value: stats.systemStatus,
-      change: stats.systemStatus === "UP" ? "All systems operational" : "Issues detected",
-      changeType: stats.systemStatus === "UP" ? "positive" as const : "negative" as const,
-      icon: Activity,
-      iconColor: stats.systemStatus === "UP" ? "text-green-600" : "text-red-600",
-    },
+
   ] : [];
 
   if (loading) {
@@ -175,7 +188,7 @@ const Index = () => {
       <div className="space-y-6">
         {/* Page Header */}
         <div>
-          <h1 className="text-4xl font-bold text-foreground">Welcome to DocVault</h1>
+          <h1 className="text-4xl font-bold text-foreground">Welcome to EasySmartDocs</h1>
           <p className="text-muted-foreground mt-2">
             Browse collections and documents organized by category
           </p>

@@ -227,6 +227,43 @@ export const deleteCollection = async (id: string): Promise<boolean> => {
 
 /**
  * Group collections by category based on naming convention
+ * If no category match, group by community name instead of "Other"
+ */
+export const groupCollectionsByCategoryWithCommunities = (
+  collections: Collection[],
+  communityMap: Map<string, string> = new Map()
+): Map<string, Collection[]> => {
+  const categoryMap = new Map<string, Collection[]>();
+  const separator = siteConfig.collectionGrouping.separator;
+  
+  collections.forEach((collection) => {
+    const name = collection.name;
+    const parts = name.split(separator);
+    
+    if (parts.length > 1 && siteConfig.collectionGrouping.enabled) {
+      // Use first part as category
+      const category = parts[0].charAt(0).toUpperCase() + parts[0].slice(1).toLowerCase();
+      
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, []);
+      }
+      categoryMap.get(category)!.push(collection);
+    } else {
+      // Try to get community name from the map, fallback to "Other"
+      const communityName = communityMap.get(collection.id) || "Other";
+      
+      if (!categoryMap.has(communityName)) {
+        categoryMap.set(communityName, []);
+      }
+      categoryMap.get(communityName)!.push(collection);
+    }
+  });
+  
+  return categoryMap;
+};
+
+/**
+ * Group collections by category based on naming convention
  */
 export const groupCollectionsByCategory = (collections: Collection[]): Map<string, Collection[]> => {
   const categoryMap = new Map<string, Collection[]>();

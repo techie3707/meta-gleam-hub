@@ -10,6 +10,7 @@ export * from "./collectionApi";
 export * from "./communityApi";
 export * from "./userApi";
 export * from "./groupApi";
+export * from "./accessManagement";
 export * from "./workflowApi";
 export * from "./processApi";
 export * from "./reportApi";

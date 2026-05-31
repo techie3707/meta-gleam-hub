@@ -31,13 +31,15 @@ import MetadataRegistry from "./pages/MetadataRegistry";
 import CreateItem from "./pages/CreateItem";
 import EditItem from "./pages/EditItem";
 import EditCommunity from "./pages/EditCommunity";
-import CreateCollection from "./pages/CreateCollection";
 import PDFViewerPage from "./pages/PDFViewerPage";
 import Policies from "./pages/Policies";
 import ResourcePolicy from "./pages/ResourcePolicy";
 import CreateResourcePolicy from "./pages/CreateResourcePolicy";
 import CreatePolicy from "./pages/CreatePolicy";
 import AssignRole from "./pages/AssignRole";
+import MyCart from "./pages/MyCart";
+import Workflow from "./pages/Workflow";
+import WorkflowTask from "./pages/WorkflowTask";
 
 const queryClient = new QueryClient();
 
@@ -126,14 +128,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CreateItem />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/collections/create"
-              element={
-                <ProtectedRoute adminOnly>
-                  <CreateCollection />
                 </ProtectedRoute>
               }
             />
@@ -262,6 +256,46 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-cart"
+              element={
+                <ProtectedRoute>
+                  <MyCart />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflowSearch"
+              element={
+                <ProtectedRoute>
+                  <Workflow />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/supervision"
+              element={
+                <ProtectedRoute>
+                  <Workflow />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflowTask"
+              element={
+                <ProtectedRoute>
+                  <WorkflowTask />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workflow-tasks"
+              element={
+                <ProtectedRoute>
+                  <WorkflowTask />
                 </ProtectedRoute>
               }
             />

@@ -3,7 +3,7 @@
  * Features: Search, zoom, page navigation, thumbnails, rotation, print, download
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +70,7 @@ export function PDFViewer({ fileUrl, fileName = "document.pdf", className }: PDF
   const [currentMatchIndex, setCurrentMatchIndex] = useState<number>(-1);
   const [isSearching, setIsSearching] = useState<boolean>(false);
   const [pdfDocument, setPdfDocument] = useState<any>(null);
+  const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch PDF with authentication on mount
   useEffect(() => {
@@ -232,6 +233,19 @@ export function PDFViewer({ fileUrl, fileName = "document.pdf", className }: PDF
     changePage(1);
   }
 
+  // Scroll to current page when page number changes via buttons
+  useEffect(() => {
+    if (pdfContainerRef.current) {
+      const pageElements = pdfContainerRef.current.querySelectorAll('[data-page-number]');
+      if (pageElements && pageElements.length > 0) {
+        const targetPage = pageElements[pageNumber - 1];
+        if (targetPage) {
+          targetPage.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }
+  }, [pageNumber, numPages]);
+
   function zoomIn() {
     setScale((prev) => Math.min(prev + 0.2, 3.0));
   }
@@ -245,12 +259,20 @@ export function PDFViewer({ fileUrl, fileName = "document.pdf", className }: PDF
   }
 
   function handleDownload() {
+    if (!pdfData) {
+      console.error("PDF data not available");
+      return;
+    }
+    
+    const blob = new Blob([pdfData as any], { type: "application/pdf" });
+    const downloadUrl = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = fileUrl;
+    link.href = downloadUrl;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
   }
 
   function handlePrint() {
@@ -405,8 +427,8 @@ export function PDFViewer({ fileUrl, fileName = "document.pdf", className }: PDF
       )}
 
       {/* PDF Document */}
-      <div className="flex-1 overflow-auto p-4">
-        <div className="flex justify-center">
+      <div className="flex-1 overflow-auto p-4" ref={pdfContainerRef}>
+        <div className="flex flex-col items-center gap-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-96">
               <div className="text-muted-foreground">Loading PDF...</div>
@@ -435,19 +457,27 @@ export function PDFViewer({ fileUrl, fileName = "document.pdf", className }: PDF
               }
               className="shadow-lg"
             >
-              <Page
-                pageNumber={pageNumber}
-                scale={scale}
-                rotate={rotation}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                customTextRenderer={customTextRenderer}
-                loading={
-                  <div className="flex items-center justify-center h-96">
-                    <div className="text-muted-foreground">Loading page...</div>
-                  </div>
-                }
-              />
+              {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
+                <div
+                  key={pageNum}
+                  data-page-number={pageNum}
+                  className="mb-6 shadow-lg bg-white rounded-lg overflow-hidden"
+                >
+                  <Page
+                    pageNumber={pageNum}
+                    scale={scale}
+                    rotate={rotation}
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    customTextRenderer={customTextRenderer}
+                    loading={
+                      <div className="flex items-center justify-center h-96">
+                        <div className="text-muted-foreground">Loading page...</div>
+                      </div>
+                    }
+                  />
+                </div>
+              ))}
             </Document>
           ) : null}
         </div>

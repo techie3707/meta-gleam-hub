@@ -5,7 +5,7 @@
 
 export const siteConfig = {
   // Application name
-  name: "DocVault",
+  name: "EasySmartDocs",
   description: "Document Management System",
 
   // API Configuration
@@ -29,12 +29,24 @@ export const siteConfig = {
   defaultSort: "score,DESC",
   
   // Sidebar Facets Configuration
+  // NOTE: Use Solr indexFieldName values (not DC metadata field names)
   sidebarFacets: [
     { name: "author", label: "Author", size: 5 },
+    { name: "assetid", label: "Asset ID", size: 5 },
+    { name: "invoiceNumber", label: "Invoice Number", size: 5 },
+    { name: "VendorName", label: "Vendor Name", size: 5 },
+    { name: "empid", label: "Employee ID", size: 5 },
+    { name: "ContractStatus", label: "Contract Status", size: 5 },
+    { name: "ContractOwner", label: "Contract Owner", size: 5 },
+    { name: "organization", label: "Organization", size: 5 },
+    { name: "DocType", label: "Document Type", size: 5 },
+    { name: "Material", label: "Material", size: 5 },
+    { name: "Status", label: "Status", size: 5 },
+    { name: "EmpName", label: "Employee Name", size: 5 },
     { name: "subject", label: "Subject", size: 5 },
-    { name: "dateIssued", label: "Date Issued", size: 5 },
-    { name: "has_content_in_original_bundle", label: "Has Files", size: 2 },
+    { name: "dc.date.issued", label: "Issued Date", size: 5 },
     { name: "entityType", label: "Entity Type", size: 5 },
+    { name: "has_content_in_original_bundle", label: "Has Files", size: 2 },
   ],
 
   // View Configuration
@@ -42,27 +54,50 @@ export const siteConfig = {
     defaultView: "grid" as "grid" | "list",
     thumbnailSize: { width: 200, height: 200 },
     showMetadataFields: [
-      "dc.title",
       "dc.contributor.author",
+      "dc.DocType",
+      "dc.Status",
+      "dc.organization",
       "dc.date.issued",
+      "dspace.entity.type",
       "dc.description.abstract",
-      "dc.subject",
-      "dc.type",
+      "dc.assetid",
+      "dc.invoiceNumber",
     ],
   },
 
   // Metadata Fields for Display
   metadataLabels: {
-    "dc.title": "Title",
     "dc.contributor.author": "Author",
-    "dc.date.issued": "Date Issued",
-    "dc.description.abstract": "Abstract",
-    "dc.description": "Description",
+    "dc.assetid": "Asset ID",
+    "dc.invoiceNumber": "Invoice Number",
+    "dc.VendorName": "Vendor Name",
+    "dc.empid": "Employee ID",
+    "dc.ContractStatus": "Contract Status",
+    "dc.ContractOwner": "Contract Owner",
+    "dc.ContractValue": "Contract Value",
+    "dc.organization": "Organization",
+    "dc.DocType": "Document Type",
+    "dc.Material": "Material",
+    "dc.PaymentTerms": "Payment Terms",
+    "dc.Quantity": "Quantity",
+    "dc.Status": "Status",
+    "dc.TotalValue": "Total Value",
+    "dc.UnitPrice": "Unit Price",
+    "dc.hrDocNo": "HR Document Number",
+    "dc.EmpName": "Employee Name",
+    "dc.description.abstract": "Diagnosis",
     "dc.subject": "Subject",
+    "dc.date.issued": "Issued Date",
+    "dspace.entity.type": "Entity Type",
+    "dc.date.created": "Date Created",
+    "dc.filenumber": "File Number",
+    "dc.publisher": "Publisher",
+    "dc.title": "Title",
+    "dc.description": "Description",
     "dc.type": "Type",
     "dc.identifier.uri": "URI",
     "dc.identifier.doi": "DOI",
-    "dc.publisher": "Publisher",
     "dc.language.iso": "Language",
     "dc.rights": "Rights",
     "dc.format.extent": "Format",
@@ -79,7 +114,7 @@ export const siteConfig = {
 
   // Collection Grouping
   collectionGrouping: {
-    enabled: true,
+    enabled: false,
     separator: "_",
   },
 
@@ -99,10 +134,12 @@ export const siteConfig = {
       { name: "Dashboard", href: "/", icon: "LayoutDashboard" },
       { name: "Search", href: "/search", icon: "Search" },
       { name: "Import", href: "/import", icon: "Upload" },
+      { name: "My Cart", href: "/my-cart", icon: "ShoppingCart" },
+      { name: "Supervision", href: "/workflowSearch", icon: "GitBranch" },
+      { name: "Workflow Task", href: "/workflowTask", icon: "CheckSquare" },
     ],
     admin: [
       { name: "Create Item", href: "/items/create", icon: "FileText" },
-      { name: "Create Collection", href: "/collections/create", icon: "FolderOpen" },
       { name: "Edit Community", href: "/communities/edit", icon: "FolderTree" },
       { name: "Users", href: "/users", icon: "Users" },
       { name: "Groups", href: "/groups", icon: "Users" },

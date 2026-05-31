@@ -11,6 +11,10 @@ import {
   LayoutGrid,
   List,
   ChevronLeft,
+  Sparkles,
+  Zap,
+  Users,
+  FileText,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -71,65 +75,26 @@ interface FacetConfig {
   defaultExpanded: boolean;
 }
 
-// Filter sections based on documentation
-const filterSections: FacetConfig[] = [
-  { id: "companycode", label: "Company Code", fieldName: "companycode", filterType: "checkbox", defaultExpanded: false },
-  { id: "unitcode", label: "Unit Code", fieldName: "unitcode", filterType: "checkbox", defaultExpanded: false },
-  { id: "employeecategory", label: "Employee Category", fieldName: "employeecategory", filterType: "checkbox", defaultExpanded: false },
-  { id: "employeecode", label: "Employee Code", fieldName: "employeecode", filterType: "checkbox", defaultExpanded: false },
-  { id: "employeename", label: "Employee Name", fieldName: "employeename", filterType: "checkbox", defaultExpanded: false },
-  { id: "employeetype", label: "Employee Type", fieldName: "employeetype", filterType: "checkbox", defaultExpanded: false },
-  { id: "post", label: "Post", fieldName: "post", filterType: "checkbox", defaultExpanded: false },
-  { id: "departmentname", label: "Department", fieldName: "departmentname", filterType: "checkbox", defaultExpanded: false },
-  { id: "filetype", label: "File Type", fieldName: "filetype", filterType: "checkbox", defaultExpanded: false },
-  { id: "mlcno", label: "MLC Number", fieldName: "mlcno", filterType: "checkbox", defaultExpanded: false },
-  { id: "doctorname", label: "Doctor Name", fieldName: "doctorname", filterType: "checkbox", defaultExpanded: false },
-  { id: "uhidno", label: "UHID Number", fieldName: "uhidno", filterType: "checkbox", defaultExpanded: false },
-  { id: "encounterid", label: "Encounter ID", fieldName: "encounterid", filterType: "checkbox", defaultExpanded: false },
-  { id: "patientname", label: "Patient Name", fieldName: "patientname", filterType: "checkbox", defaultExpanded: false },
-  { id: "mrdno", label: "MRD Number", fieldName: "mrdno", filterType: "checkbox", defaultExpanded: false },
-  { id: "speciality", label: "Speciality", fieldName: "speciality", filterType: "checkbox", defaultExpanded: false },
-  { id: "date", label: "Joining Date", fieldName: "date", filterType: "range", defaultExpanded: false },
-  { id: "doa", label: "Date of Admission", fieldName: "doa", filterType: "range", defaultExpanded: false },
-  { id: "dod", label: "Date of Discharge", fieldName: "dod", filterType: "range", defaultExpanded: false },
+// Generate filter sections dynamically from siteConfig
+const generateFilterSections = (): FacetConfig[] => {
+  const sections: FacetConfig[] = siteConfig.sidebarFacets.map((facet) => ({
+    id: facet.name,
+    label: facet.label,
+    fieldName: facet.name,
+    filterType: "checkbox" as const,
+    defaultExpanded: false,
+  }));
+  
+  // Update "has_content_in_original_bundle" to be boolean type
+  const hasFilesIndex = sections.findIndex((s) => s.id === "has_content_in_original_bundle");
+  if (hasFilesIndex !== -1) {
+    sections[hasFilesIndex].filterType = "boolean";
+  }
+  
+  return sections;
+};
 
-  {
-    id: 'author',
-    label: 'Author',
-    defaultExpanded: false,
-    fieldName: 'author',
-    filterType: 'checkbox'
-  },
-  {
-    id: 'contenttype',
-    label: 'Content Type',
-    defaultExpanded: false,
-    fieldName: 'contenttype',
-    filterType: 'checkbox'
-  },
-  {
-    id: 'date',
-    label: 'Date Created',
-    defaultExpanded: false,
-    fieldName: 'dateIssued',
-    filterType: 'range'
-  },
-  {
-    id: 'publisher',
-    label: 'Publisher',
-    defaultExpanded: false,
-    fieldName: 'publisher',
-    filterType: 'checkbox'
-  },
-  {
-    id: 'keyword',
-    label: 'Keyword',
-    defaultExpanded: false,
-    fieldName: 'keyword',
-    filterType: 'checkbox'
-  },
-  { id: "has_content_in_original_bundle", label: "Has Files", fieldName: "has_content_in_original_bundle", filterType: "boolean", defaultExpanded: false },
-];
+const filterSections: FacetConfig[] = generateFilterSections();
 
 const SearchAdvanced = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -204,10 +169,14 @@ const SearchAdvanced = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    if (scope) {
-      handleSearch(filters, page, size, true, getSortParam());
-    }
-  }, [scope]);
+    // Reset facet state when collection changes
+    setFacets({});
+    setFacetPages({});
+    setExpandedFacets([]);
+    setFilters({});
+    setPage(1);
+    handleSearch({}, 1, size, true, getSortParam());
+  }, [scope, size]);
 
   const loadCollections = async () => {
     try {
@@ -482,59 +451,71 @@ const SearchAdvanced = () => {
   };
 
   const renderGridView = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
       {searchResults.map((result, index) => (
         <Card
           key={result.uuid}
-          className="cursor-pointer hover:shadow-lg transition-all duration-200 animate-slide-up"
+          className="cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 animate-slide-up border-0 shadow-md bg-white dark:bg-slate-800 group overflow-hidden"
           style={{ animationDelay: `${index * 50}ms` }}
           onClick={() => navigate(`/documents/${result.uuid}`)}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="flex items-start gap-3">
-              <Checkbox
-                checked={selectedItems.includes(result.uuid)}
-                onCheckedChange={() => {
-                  setSelectedItems((prev) =>
-                    prev.includes(result.uuid)
-                      ? prev.filter((id) => id !== result.uuid)
-                      : [...prev, result.uuid]
-                  );
-                }}
-                onClick={(e) => e.stopPropagation()}
-              />
+              <div className="mt-1">
+                <Checkbox
+                  checked={selectedItems.includes(result.uuid)}
+                  onCheckedChange={() => {
+                    setSelectedItems((prev) =>
+                      prev.includes(result.uuid)
+                        ? prev.filter((id) => id !== result.uuid)
+                        : [...prev, result.uuid]
+                    );
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="border-slate-300 dark:border-slate-600"
+                />
+              </div>
               <div className="flex-1 min-w-0">
                 {result.thumbnail?.href && (
-                  <div className="w-full h-40 bg-muted rounded-md mb-3 overflow-hidden relative">
+                  <div className="w-full h-40 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 rounded-lg mb-3 overflow-hidden relative shadow-md">
                     <img
                       src={result.thumbnail.href.startsWith('http')
                         ? result.thumbnail.href
                         : `${siteConfig.apiEndpoint}${result.thumbnail.href}`}
                       alt={result.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                   </div>
                 )}
-                <h3 className="font-semibold text-foreground truncate mb-2">
+                <h3 className="font-bold text-foreground truncate mb-3 text-sm leading-tight group-hover:text-blue-600 transition">
                   {getMetadataValue(result.metadata, "dc.title") || result.name || "Untitled"}
                 </h3>
-                <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="space-y-2 text-xs text-muted-foreground">
                   {getMetadataValue(result.metadata, "dc.uhidno") && (
-                    <p className="truncate">UHID: {getMetadataValue(result.metadata, "dc.uhidno")}</p>
+                    <p className="truncate flex items-center gap-1.5">
+                      <FileText className="w-3 h-3 flex-shrink-0 text-blue-500" />
+                      <span>UHID: {getMetadataValue(result.metadata, "dc.uhidno")}</span>
+                    </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.patientname") && (
-                    <p className="truncate">Patient: {getMetadataValue(result.metadata, "dc.patientname")}</p>
+                    <p className="truncate flex items-center gap-1.5">
+                      <Users className="w-3 h-3 flex-shrink-0 text-purple-500" />
+                      <span>{getMetadataValue(result.metadata, "dc.patientname")}</span>
+                    </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.doctorname") && (
-                    <p className="truncate">Doctor: {getMetadataValue(result.metadata, "dc.doctorname")}</p>
+                    <p className="truncate flex items-center gap-1.5">
+                      <Users className="w-3 h-3 flex-shrink-0 text-green-500" />
+                      <span>{getMetadataValue(result.metadata, "dc.doctorname")}</span>
+                    </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.date.created") && (
-                    <p className="truncate flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {format(new Date(getMetadataValue(result.metadata, "dc.date.created")!), "MMM dd, yyyy")}
+                    <p className="truncate flex items-center gap-1.5">
+                      <Calendar className="w-3 h-3 flex-shrink-0 text-orange-500" />
+                      <span>{format(new Date(getMetadataValue(result.metadata, "dc.date.created")!), "MMM dd, yyyy")}</span>
                     </p>
                   )}
                 </div>
@@ -551,32 +532,34 @@ const SearchAdvanced = () => {
       {searchResults.map((result, index) => (
         <Card
           key={result.uuid}
-          className="cursor-pointer hover:shadow-lg transition-all duration-200 animate-slide-up"
+          className="cursor-pointer hover:shadow-xl hover:border-blue-500/30 transition-all duration-300 animate-slide-up border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 group"
           style={{ animationDelay: `${index * 50}ms` }}
           onClick={() => navigate(`/documents/${result.uuid}`)}
         >
-          <CardContent className="p-4">
+          <CardContent className="p-5">
             <div className="flex items-start gap-4">
-              <Checkbox
-                checked={selectedItems.includes(result.uuid)}
-                onCheckedChange={() => {
-                  setSelectedItems((prev) =>
-                    prev.includes(result.uuid)
-                      ? prev.filter((id) => id !== result.uuid)
-                      : [...prev, result.uuid]
-                  );
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-1"
-              />
+              <div className="mt-1">
+                <Checkbox
+                  checked={selectedItems.includes(result.uuid)}
+                  onCheckedChange={() => {
+                    setSelectedItems((prev) =>
+                      prev.includes(result.uuid)
+                        ? prev.filter((id) => id !== result.uuid)
+                        : [...prev, result.uuid]
+                    );
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="border-slate-300 dark:border-slate-600"
+                />
+              </div>
               {result.thumbnail?.href && (
-                <div className="w-24 h-32 bg-muted rounded-md overflow-hidden flex-shrink-0">
+                <div className="w-24 h-32 bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
                   <img
                     src={result.thumbnail.href.startsWith('http')
                       ? result.thumbnail.href
                       : `${siteConfig.apiEndpoint}${result.thumbnail.href}`}
                     alt={result.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
@@ -584,44 +567,45 @@ const SearchAdvanced = () => {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-lg text-foreground mb-2">
+                <h3 className="font-bold text-lg text-foreground mb-3 group-hover:text-blue-600 transition">
                   {getMetadataValue(result.metadata, "dc.title") || result.name || "Untitled"}
                 </h3>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm text-muted-foreground">
                   {getMetadataValue(result.metadata, "dc.uhidno") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">UHID:</span> {getMetadataValue(result.metadata, "dc.uhidno")}
+                    <p>
+                      <span className="font-semibold text-foreground">UHID:</span> {getMetadataValue(result.metadata, "dc.uhidno")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.patientname") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Patient:</span> {getMetadataValue(result.metadata, "dc.patientname")}
+                    <p>
+                      <span className="font-semibold text-foreground">Patient:</span> {getMetadataValue(result.metadata, "dc.patientname")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.encounterid") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Encounter:</span> {getMetadataValue(result.metadata, "dc.encounterid")}
+                    <p>
+                      <span className="font-semibold text-foreground">Encounter:</span> {getMetadataValue(result.metadata, "dc.encounterid")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.doctorname") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Doctor:</span> {getMetadataValue(result.metadata, "dc.doctorname")}
+                    <p>
+                      <span className="font-semibold text-foreground">Doctor:</span> {getMetadataValue(result.metadata, "dc.doctorname")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.mrdno") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">MRD:</span> {getMetadataValue(result.metadata, "dc.mrdno")}
+                    <p>
+                      <span className="font-semibold text-foreground">MRD:</span> {getMetadataValue(result.metadata, "dc.mrdno")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.speciality") && (
-                    <p className="text-muted-foreground">
-                      <span className="font-medium">Speciality:</span> {getMetadataValue(result.metadata, "dc.speciality")}
+                    <p>
+                      <span className="font-semibold text-foreground">Speciality:</span> {getMetadataValue(result.metadata, "dc.speciality")}
                     </p>
                   )}
                   {getMetadataValue(result.metadata, "dc.date.created") && (
-                    <p className="text-muted-foreground flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
-                      {format(new Date(getMetadataValue(result.metadata, "dc.date.created")!), "MMM dd, yyyy")}
+                    <p className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-orange-500" />
+                      <span className="font-semibold text-foreground">Date:</span>
+                      <span>{format(new Date(getMetadataValue(result.metadata, "dc.date.created")!), "MMM dd, yyyy")}</span>
                     </p>
                   )}
                 </div>
@@ -639,54 +623,55 @@ const SearchAdvanced = () => {
       const isExpanded = expandedFacets.includes(section.id);
 
       return (
-        <Collapsible
-          key={section.id}
-          open={isExpanded}
-          onOpenChange={() => {
-            setExpandedFacets((prev) =>
-              prev.includes(section.id)
-                ? prev.filter((id) => id !== section.id)
-                : [...prev, section.id]
-            );
-          }}
-        >
-          <CollapsibleTrigger className="flex items-center justify-between w-full p-3 hover:bg-muted/50 rounded-lg transition-colors">
-            <span className="font-medium text-sm">{section.label}</span>
-            <ChevronRight className={cn("w-4 h-4 transition-transform", isExpanded && "rotate-90")} />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="px-3 pb-2">
-            <div className="space-y-2 mt-2">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Checkbox
-                    checked={filters[section.id] === true}
-                    onCheckedChange={(checked) =>
-                      updateFilter(section.id, true, checked as boolean)
-                    }
-                  />
-                  <span className="text-sm text-foreground">Yes</span>
-                </label>
-                <Badge variant="secondary" className="ml-2">
-                  {hasFileCounts.hasFileCount}
-                </Badge>
+        <div key={section.id} className="border-b border-slate-200 dark:border-slate-700 -mx-2">
+          <Collapsible
+            open={isExpanded}
+            onOpenChange={() => {
+              setExpandedFacets((prev) =>
+                prev.includes(section.id)
+                  ? prev.filter((id) => id !== section.id)
+                  : [...prev, section.id]
+              );
+            }}
+          >
+            <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-2 hover:bg-blue-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors group">
+              <span className="font-semibold text-xs text-foreground">{section.label}</span>
+              <ChevronRight className={cn("w-4 h-4 transition-transform text-muted-foreground group-hover:text-blue-600", isExpanded && "rotate-90")} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-0 pb-0">
+              <div className="space-y-1 mt-1">
+                <div className="flex items-center justify-between px-2 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-700/50 transition">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Checkbox
+                      checked={filters[section.id] === true}
+                      onCheckedChange={(checked) =>
+                        updateFilter(section.id, true, checked as boolean)
+                      }
+                    />
+                    <span className="text-xs font-medium text-foreground">Yes</span>
+                  </label>
+                  <Badge className="ml-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full text-xs">
+                    {hasFileCounts.hasFileCount}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between px-2 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-700/50 transition">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Checkbox
+                      checked={filters[section.id] === false}
+                      onCheckedChange={(checked) =>
+                        updateFilter(section.id, false, checked as boolean)
+                      }
+                    />
+                    <span className="text-xs font-medium text-foreground">No</span>
+                  </label>
+                  <Badge className="ml-1 bg-gradient-to-r from-slate-500 to-slate-600 text-white rounded-full text-xs">
+                    {hasFileCounts.noFileCount}
+                  </Badge>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Checkbox
-                    checked={filters[section.id] === false}
-                    onCheckedChange={(checked) =>
-                      updateFilter(section.id, false, checked as boolean)
-                    }
-                  />
-                  <span className="text-sm text-foreground">No</span>
-                </label>
-                <Badge variant="secondary" className="ml-2">
-                  {hasFileCounts.noFileCount}
-                </Badge>
-              </div>
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
       );
     }
 
@@ -699,62 +684,71 @@ const SearchAdvanced = () => {
     const isExpanded = expandedFacets.includes(section.id);
 
     return (
-      <Collapsible
-        key={section.id}
-        open={isExpanded}
-        onOpenChange={() => {
-          setExpandedFacets((prev) =>
-            prev.includes(section.id)
-              ? prev.filter((id) => id !== section.id)
-              : [...prev, section.id]
-          );
-        }}
-      >
-        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 hover:bg-muted/50 rounded-lg transition-colors">
-          <span className="font-medium text-sm">{section.label}</span>
-          <ChevronRight className={cn("w-4 h-4 transition-transform", isExpanded && "rotate-90")} />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="px-3 pb-2">
-          <div className="space-y-2 mt-2">
-            {facetValues.map((value) => {
-              const currentFilter = filters[section.id] || [];
-              const isChecked = Array.isArray(currentFilter) && currentFilter.includes(value.label);
+      <div key={section.id} className="border-b border-slate-200 dark:border-slate-700 -mx-2">
+        <Collapsible
+          open={isExpanded}
+          onOpenChange={() => {
+            setExpandedFacets((prev) =>
+              prev.includes(section.id)
+                ? prev.filter((id) => id !== section.id)
+                : [...prev, section.id]
+            );
+          }}
+        >
+          <CollapsibleTrigger className="flex items-center justify-between w-full px-2 py-2 hover:bg-blue-50 dark:hover:bg-slate-700/50 rounded-lg transition-colors group">
+            <span className="font-semibold text-xs text-foreground">{section.label}</span>
+            <ChevronRight className={cn("w-4 h-4 transition-transform text-muted-foreground group-hover:text-blue-600", isExpanded && "rotate-90")} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="px-0 pb-0">
+            <div className="space-y-1 mt-1">
+              {facetValues.map((value) => {
+                const currentFilter = filters[section.id] || [];
+                const isChecked = Array.isArray(currentFilter) && currentFilter.includes(value.label);
 
-              return (
-                <div key={value.label} className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer flex-1">
-                    <Checkbox
-                      checked={isChecked}
-                      onCheckedChange={(checked) =>
-                        updateFilter(section.id, value.label, checked as boolean)
-                      }
-                    />
-                    <span className="text-sm text-foreground truncate">{value.label}</span>
-                  </label>
-                  <Badge variant="secondary" className="ml-2">
-                    {value.count}
-                  </Badge>
-                </div>
-              );
-            })}
-            {facetValues.length >= 5 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                onClick={() => loadMoreFacetItems(section.id)}
-                disabled={loadingMoreFacets[section.id]}
-              >
-                {loadingMoreFacets[section.id] ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Show More"
-                )}
-              </Button>
-            )}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+                return (
+                  <div key={value.label} className="flex items-center justify-between px-2 py-3.5 hover:bg-blue-50 dark:hover:bg-slate-700/50 transition">
+                    <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={(checked) =>
+                          updateFilter(section.id, value.label, checked as boolean)
+                        }
+                      />
+                      <span className="text-xs font-medium text-foreground truncate">{value.label}</span>
+                    </label>
+                    <Badge className={cn(
+                      "ml-1 rounded-full text-xs font-bold",
+                      isChecked 
+                        ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white" 
+                        : "bg-slate-100 dark:bg-slate-700 text-foreground"
+                    )}>
+                      {value.count}
+                    </Badge>
+                  </div>
+                );
+              })}
+              {facetValues.length >= 5 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full mt-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-slate-700/50 font-semibold text-xs h-7 rounded-none"
+                  onClick={() => loadMoreFacetItems(section.id)}
+                  disabled={loadingMoreFacets[section.id]}
+                >
+                  {loadingMoreFacets[section.id] ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <ChevronDown className="w-3 h-3" />
+                      Show More
+                    </span>
+                  )}
+                </Button>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
     );
   };
 
@@ -762,19 +756,29 @@ const SearchAdvanced = () => {
     <AppLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Search Documents</h1>
-          <p className="text-muted-foreground mt-1">
-            Find documents with advanced filtering and faceted search
-          </p>
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 rounded-2xl blur-2xl" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-sm font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Advanced Search</span>
+            </div>
+            <h1 className="text-4xl font-bold text-foreground mb-2 tracking-tight">Search Documents</h1>
+            <p className="text-lg text-muted-foreground">
+              Find documents effortlessly with advanced filtering and intelligent faceted search
+            </p>
+          </div>
         </div>
 
         {/* Search Bar */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex gap-4">
-              <div className="relative flex-1">
-                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800">
+          <CardContent className="p-8">
+            <div className="flex gap-3 mb-6">
+              <div className="relative flex-1 group">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl blur opacity-0 group-focus-within:opacity-20 transition duration-300" />
+                <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-blue-600 transition" />
                 <Input
                   type="text"
                   placeholder="Search by patient name, UHID, doctor, diagnosis..."
@@ -787,7 +791,7 @@ const SearchAdvanced = () => {
                       handleSearch(filters, 1, size, true, getSortParam());
                     }
                   }}
-                  className="pl-12 h-12 text-base"
+                  className="pl-12 h-12 text-base bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition relative z-10"
                 />
               </div>
               <Button
@@ -798,14 +802,16 @@ const SearchAdvanced = () => {
                   handleSearch(filters, 1, size, true, getSortParam());
                 }}
                 disabled={loading}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition px-8"
               >
-                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <SearchIcon className="w-4 h-4 mr-2" />}
-                Search
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+                {loading ? "Searching..." : "Search"}
               </Button>
               <Button
                 variant="outline"
                 size="lg"
                 onClick={() => setShowFilters(!showFilters)}
+                className="border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
               >
                 <Filter className="w-4 h-4 mr-2" />
                 {showFilters ? "Hide" : "Show"} Filters
@@ -813,11 +819,14 @@ const SearchAdvanced = () => {
             </div>
 
             {/* Collection & Sort */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Collection</label>
+                <label className="text-sm font-semibold mb-2 block text-foreground flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Collection
+                </label>
                 <Select value={scope || "all"} onValueChange={(val) => setScope(val === "all" ? "" : val)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-slate-200 dark:border-slate-700 h-11 bg-white dark:bg-slate-800">
                     <SelectValue placeholder="All Collections" />
                   </SelectTrigger>
                   <SelectContent>
@@ -831,12 +840,15 @@ const SearchAdvanced = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Sort By</label>
+                <label className="text-sm font-semibold mb-2 block text-foreground flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  Sort By
+                </label>
                 <Select value={sortOption} onValueChange={(val) => {
                   setSortOption(val);
                   handleSearch(filters, page, size, false, getSortParam());
                 }}>
-                  <SelectTrigger>
+                  <SelectTrigger className="border-slate-200 dark:border-slate-700 h-11 bg-white dark:bg-slate-800">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -856,21 +868,29 @@ const SearchAdvanced = () => {
         <div className="flex gap-6">
           {/* Filter Sidebar */}
           {showFilters && (
-            <div className="w-80 flex-shrink-0 space-y-4">
-              <Card>
-                <CardHeader>
+            <div className="w-64 flex-shrink-0 max-h-screen flex flex-col">
+              <Card className="flex flex-col h-auto border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800">
+                <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-3 px-3 pt-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Filters</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={resetFilters}>
-                      Reset All
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-5 h-5 text-blue-600" />
+                      <CardTitle className="text-base font-bold text-foreground">Filters</CardTitle>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={resetFilters}
+                      className="text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 h-7 px-2"
+                    >
+                      Reset
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto">
+                <CardContent className="space-y-1 overflow-y-auto scrollbar-hide p-2">
                   {facetsLoading ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {[...Array(5)].map((_, i) => (
-                        <Skeleton key={i} className="h-10 w-full" />
+                        <Skeleton key={i} className="h-10 w-full rounded-lg" />
                       ))}
                     </div>
                   ) : (
@@ -884,68 +904,90 @@ const SearchAdvanced = () => {
           {/* Results */}
           <div className="flex-1 space-y-4">
             {/* Results Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Checkbox
-                  checked={selectedItems.length === searchResults.length && searchResults.length > 0}
-                  onCheckedChange={handleSelectAll}
-                />
-                <p className="text-sm text-muted-foreground">
-                  {totalData} results found
-                  {selectedItems.length > 0 && ` • ${selectedItems.length} selected`}
-                  {loadingTime && ` • Loaded in ${loadingTime}s`}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Select value={String(size)} onValueChange={(val) => {
-                  setSize(parseInt(val));
-                  setPage(1);
-                  handleSearch(filters, 1, parseInt(val), false, getSortParam());
-                }}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 / page</SelectItem>
-                    <SelectItem value="10">10 / page</SelectItem>
-                    <SelectItem value="20">20 / page</SelectItem>
-                    <SelectItem value="50">50 / page</SelectItem>
-                    <SelectItem value="100">100 / page</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="flex gap-1 border rounded-lg p-1">
-                  <Button
-                    variant={viewMode === "grid" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <LayoutGrid className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "list" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setViewMode("list")}
-                  >
-                    <List className="w-4 h-4" />
-                  </Button>
+            <Card className="border-0 shadow-md bg-gradient-to-r from-blue-50 to-purple-50 dark:from-slate-800 dark:to-slate-900">
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Checkbox
+                      checked={selectedItems.length === searchResults.length && searchResults.length > 0}
+                      onCheckedChange={handleSelectAll}
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {totalData} results found
+                      </p>
+                      {(selectedItems.length > 0 || loadingTime) && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {selectedItems.length > 0 && `${selectedItems.length} selected • `}
+                          {loadingTime && `Loaded in ${loadingTime}s`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Select value={String(size)} onValueChange={(val) => {
+                      setSize(parseInt(val));
+                      setPage(1);
+                      handleSearch(filters, 1, parseInt(val), false, getSortParam());
+                    }}>
+                      <SelectTrigger className="w-32 bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5">5 / page</SelectItem>
+                        <SelectItem value="10">10 / page</SelectItem>
+                        <SelectItem value="20">20 / page</SelectItem>
+                        <SelectItem value="50">50 / page</SelectItem>
+                        <SelectItem value="100">100 / page</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="flex gap-1 bg-white dark:bg-slate-700 rounded-lg p-1 border border-slate-200 dark:border-slate-600">
+                      <Button
+                        variant={viewMode === "grid" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("grid")}
+                        className={viewMode === "grid" ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white" : "text-slate-600 dark:text-slate-300"}
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant={viewMode === "list" ? "default" : "ghost"}
+                        size="sm"
+                        onClick={() => setViewMode("list")}
+                        className={viewMode === "list" ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white" : "text-slate-600 dark:text-slate-300"}
+                      >
+                        <List className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Bulk Actions */}
             {selectedItems.length > 0 && (
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <span className="text-sm font-medium">
-                    {selectedItems.length} item{selectedItems.length > 1 ? "s" : ""} selected
+              <Card className="border-0 shadow-md bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 animate-in fade-in slide-in-from-top-2 duration-300">
+                <CardContent className="p-5 flex items-center justify-between">
+                  <span className="text-sm font-semibold text-foreground">
+                    {selectedItems.length} item{selectedItems.length > 1 ? "s" : ""} selected for action
                   </span>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleBulkDelete}>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      onClick={handleBulkDelete}
+                      className="bg-red-600 hover:bg-red-700 shadow-md"
+                    >
                       <Trash2 className="w-4 h-4 mr-2" />
                       Delete
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setSelectedItems([])}>
-                      Discard
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setSelectedItems([])}
+                      className="border-slate-300 dark:border-slate-600"
+                    >
+                      Cancel
                     </Button>
                   </div>
                 </CardContent>
@@ -954,24 +996,33 @@ const SearchAdvanced = () => {
 
             {/* Results Display */}
             {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <div className="flex flex-col items-center justify-center py-24">
+                <div className="relative w-16 h-16 mb-4">
+                  <Loader2 className="w-16 h-16 animate-spin text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600" />
+                </div>
+                <p className="text-sm text-muted-foreground font-medium">Searching documents...</p>
               </div>
             ) : searchResults.length === 0 ? (
-              <Card>
-                <CardContent className="p-12 text-center">
-                  <SearchIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
-                  <h3 className="text-lg font-semibold mb-2">No results found</h3>
-                  <p className="text-muted-foreground mb-4">
+              <Card className="border-0 shadow-lg bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+                <CardContent className="p-16 text-center">
+                  <div className="mb-4">
+                    <SearchIcon className="w-20 h-20 mx-auto text-slate-300 dark:text-slate-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold mb-2 text-foreground">No results found</h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
                     {scope
                       ? "This collection appears to be empty or contains no items matching your criteria."
-                      : "Try adjusting your search query or filters"}
+                      : "Try adjusting your search query or filters to find what you're looking for."}
                   </p>
                   {scope && (
-                    <Button variant="outline" onClick={() => {
-                      setScope("");
-                      setFilters({});
-                    }}>
+                    <Button 
+                      onClick={() => {
+                        setScope("");
+                        setFilters({});
+                      }}
+                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+                    >
+                      <SearchIcon className="w-4 h-4 mr-2" />
                       Search All Collections
                     </Button>
                   )}

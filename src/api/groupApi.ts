@@ -26,6 +26,29 @@ export interface GroupListResponse {
   };
 }
 
+const mapGroupListResponse = (
+  data: any,
+  fallbackSize: number
+): GroupListResponse => {
+  const groups = data?._embedded?.groups || [];
+
+  return {
+    groups: groups.map((group: any) => ({
+      id: group.id,
+      uuid: group.uuid || group.id,
+      name: group.name,
+      permanent: group.permanent,
+      metadata: group.metadata || {},
+    })),
+    page: data?.page || {
+      size: fallbackSize,
+      totalElements: 0,
+      totalPages: 0,
+      number: 0,
+    },
+  };
+};
+
 /**
  * Search groups by metadata
  */
@@ -35,33 +58,54 @@ export const searchGroups = async (
   size = 10
 ): Promise<GroupListResponse> => {
   try {
+    // Preferred endpoint used in newer DSpace deployments.
     const response = await axiosInstance.get(
       `/api/eperson/groups/search/byMetadata?page=${page}&size=${size}&query=${encodeURIComponent(query)}&embed=object`
     );
-    
-    const groups = response.data._embedded?.groups || [];
-    
-    return {
-      groups: groups.map((group: any) => ({
-        id: group.id,
-        uuid: group.uuid || group.id,
-        name: group.name,
-        permanent: group.permanent,
-        metadata: group.metadata || {},
-      })),
-      page: response.data.page || {
-        size,
-        totalElements: 0,
-        totalPages: 0,
-        number: 0,
-      },
-    };
-  } catch (error) {
-    console.error("Search groups error:", error);
-    return {
-      groups: [],
-      page: { size, totalElements: 0, totalPages: 0, number: 0 },
-    };
+    return mapGroupListResponse(response.data, size);
+  } catch (error: any) {
+    console.warn("byMetadata group search failed, trying fallback endpoints:", error?.response?.status);
+
+    try {
+      // Fallback for deployments where metadata search is unavailable.
+      if (query.trim()) {
+        const byNameResponse = await axiosInstance.get(
+          `/api/eperson/groups/search/byName?name=${encodeURIComponent(query)}`
+        );
+        const group = byNameResponse.data;
+
+        return {
+          groups: group
+            ? [
+                {
+                  id: group.id,
+                  uuid: group.uuid || group.id,
+                  name: group.name,
+                  permanent: group.permanent,
+                  metadata: group.metadata || {},
+                },
+              ]
+            : [],
+          page: {
+            size,
+            totalElements: group ? 1 : 0,
+            totalPages: 1,
+            number: page,
+          },
+        };
+      }
+
+      const listResponse = await axiosInstance.get(
+        `/api/eperson/groups?page=${page}&size=${size}`
+      );
+      return mapGroupListResponse(listResponse.data, size);
+    } catch (fallbackError) {
+      console.error("Search groups fallback error:", fallbackError);
+      return {
+        groups: [],
+        page: { size, totalElements: 0, totalPages: 0, number: 0 },
+      };
+    }
   }
 };
 

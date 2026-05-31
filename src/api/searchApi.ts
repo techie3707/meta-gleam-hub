@@ -137,8 +137,7 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
     queryParams.append("page", String(params.page || 0));
     queryParams.append("size", String(params.size || siteConfig.defaultPageSize));
     queryParams.append("sort", params.sort || siteConfig.defaultSort);
-    queryParams.append("embed", "thumbnail");
-    queryParams.append("embed", "item/thumbnail");
+    queryParams.append("embed", "indexableObject");
     
     if (params.query) queryParams.append("query", params.query);
     if (params.scope) queryParams.append("scope", params.scope);
@@ -165,14 +164,24 @@ export const searchObjects = async (params: SearchParams): Promise<SearchRespons
     
     const results: SearchResult[] = objects.map((obj: any) => {
       const indexableObject = obj._embedded?.indexableObject || obj.indexableObject;
+      const metadata = indexableObject?.metadata || {};
+      
+      // Try to get title from multiple metadata fields in order of priority
+      const name = 
+        metadata["dc.title"]?.[0]?.value ||
+        metadata["dc.DocNumber"]?.[0]?.value ||
+        metadata["dc.assetid"]?.[0]?.value ||
+        metadata["dc.empid"]?.[0]?.value ||
+        metadata["dc.ContractOwner"]?.[0]?.value ||
+        indexableObject?.name;
+      
       return {
         id: indexableObject?.id,
         uuid: indexableObject?.uuid || indexableObject?.id,
-        name: indexableObject?.name,
+        name,
         handle: indexableObject?.handle,
-        metadata: indexableObject?.metadata || {},
+        metadata,
         type: indexableObject?.type,
-        thumbnail: obj._embedded?.thumbnail || indexableObject?._embedded?.thumbnail,
       };
     });
 
@@ -251,8 +260,12 @@ export const fetchFacetValues = async (
       hasMore: page.number < (page.totalPages || 1) - 1,
       page,
     };
-  } catch (error) {
-    console.error(`Fetch facet ${facetName} error:`, error);
+  } catch (error: any) {
+    // Silently handle 400/404 errors - these facets may not be configured in the backend
+    const status = error.response?.status;
+    if (status !== 400 && status !== 404) {
+      console.error(`Fetch facet ${facetName} error:`, error);
+    }
     return {
       name: facetName,
       facetType: "text",

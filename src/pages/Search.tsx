@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, Filter, Calendar, Folder, SortAsc, Loader2, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { Search as SearchIcon, Filter, Calendar, Folder, SortAsc, Loader2, ChevronLeft, ChevronRight, ChevronDown, X, FileText } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,7 @@ interface DynamicFacetState {
 
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("query") || "");
   const [scope, setScope] = useState(searchParams.get("scope") || "");
   const [sort, setSort] = useState(searchParams.get("sort") || siteConfig.defaultSort);
@@ -199,9 +200,18 @@ const Search = () => {
   // Map search results to DocumentCard format
   const mapResultToDocument = (result: SearchResult) => {
     const metadata = result.metadata || {};
+    const title = 
+      metadata["dc.title"]?.[0]?.value ||
+      metadata["dc.DocNumber"]?.[0]?.value ||
+      metadata["dc.assetid"]?.[0]?.value ||
+      metadata["dc.empid"]?.[0]?.value ||
+      metadata["dc.ContractOwner"]?.[0]?.value ||
+      result.name || 
+      "Untitled";
+    
     return {
       id: result.uuid,
-      title: result.name || metadata["dc.title"]?.[0]?.value || "Untitled",
+      title,
       type: "pdf" as const, // Default, could be derived from bitstream
       collection: metadata["dc.source"]?.[0]?.value || "",
       uploadedAt: metadata["dc.date.issued"]?.[0]?.value 
@@ -429,7 +439,7 @@ const Search = () => {
         <div className="flex gap-6">
           {/* Dynamic Facets Sidebar */}
           {showFilters && (
-            <div className="w-64 flex-shrink-0 space-y-4">
+            <div className="w-64 flex-shrink-0 space-y-4 max-h-[calc(100vh-300px)] overflow-y-auto scrollbar-hide">
               {facetConfigLoading ? (
                 Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="bg-card rounded-lg border border-border p-4 space-y-2">
@@ -541,20 +551,38 @@ const Search = () => {
                 <p>No results found. Try adjusting your search or filters.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {results.map((result, index) => (
                   <div
                     key={result.uuid}
                     style={{ animationDelay: `${index * 50}ms` }}
-                    className="animate-slide-up flex items-start gap-3"
+                    className="animate-slide-up group cursor-pointer"
+                    onClick={() => navigate(`/documents/${result.uuid}`)}
                   >
-                    <Checkbox
-                      checked={selectedItems.includes(result.uuid)}
-                      onCheckedChange={() => handleSelectItem(result.uuid)}
-                      className="mt-4"
-                    />
-                    <div className="flex-1">
-                      <DocumentCard document={mapResultToDocument(result)} variant="list" />
+                    <div className="relative p-4 bg-card rounded-lg border border-border hover:shadow-lg hover:border-primary transition-all">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <FileText className="w-8 h-8 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors text-sm">
+                            {result.name || "Untitled"}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {result.metadata?.["dc.contributor.author"]?.[0]?.value || "Unknown Author"}
+                          </p>
+                          {result.metadata?.["dc.date.issued"]?.[0]?.value && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {new Date(result.metadata["dc.date.issued"][0].value).toLocaleDateString()}
+                            </p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
+                            {result.metadata?.["dc.description"]?.[0]?.value || 
+                             result.metadata?.["dc.description.abstract"]?.[0]?.value ||
+                             "No description"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

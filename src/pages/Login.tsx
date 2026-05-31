@@ -56,7 +56,7 @@ const Login = () => {
               WELCOME
             </h1>
             <p className="text-muted-foreground">
-              Sign in to your DocVault account
+              Sign in to your EasySmartDocs account
             </p>
           </div>
 

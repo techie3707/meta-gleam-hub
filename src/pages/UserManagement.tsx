@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Search, UserPlus, Edit, Trash2, Users, Shield } from "lucide-react";
+import { Search, UserPlus, Edit, Trash2, Users, Shield, Lock } from "lucide-react";
 import {
   searchUsers,
   createUser,
@@ -71,13 +71,10 @@ interface Collection {
   metadata: Record<string, Array<{ value: string }>>;
 }
 
-interface RoleAssignment {
-  collectionId: string;
-  collectionName: string;
-  submitter: boolean;
-  reviewer: boolean;
-  editor: boolean;
-  finalEditor: boolean;
+interface SelectedPermissions {
+  read: boolean;
+  admin: boolean;
+  upload: boolean;
 }
 
 const UserManagement = () => {
@@ -92,7 +89,12 @@ const UserManagement = () => {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [roleAssignments, setRoleAssignments] = useState<RoleAssignment[]>([]);
+  const [selectedPermissions, setSelectedPermissions] = useState<SelectedPermissions>({
+    read: false,
+    admin: false,
+    upload: false,
+  });
+  const [permissionCollections, setPermissionCollections] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     email: "",
     firstName: "",
@@ -142,16 +144,9 @@ const UserManagement = () => {
     }
   };
 
-  const initializeRoleAssignments = () => {
-    const assignments = collections.map((col) => ({
-      collectionId: col.id || col.uuid,
-      collectionName: col.metadata?.["dc.title"]?.[0]?.value || col.name,
-      submitter: false,
-      reviewer: false,
-      editor: false,
-      finalEditor: false,
-    }));
-    setRoleAssignments(assignments);
+  const initializePermissions = () => {
+    setPermissionCollections([]);
+    setSelectedPermissions({ read: false, admin: false, upload: false });
   };
 
   const handleAddUser = async () => {
@@ -173,12 +168,12 @@ const UserManagement = () => {
         canLogIn: formData.canLogIn,
       });
 
-      // Assign roles to the created user
-      await assignRolesToUser(createdUser.id);
+      // Assign permissions to the created user
+      await assignPermissionsToUser(createdUser.id);
 
       toast({
         title: "Success",
-        description: "User created and roles assigned successfully",
+        description: "User created with permissions assigned successfully",
       });
 
       setShowAddDialog(false);
@@ -227,12 +222,12 @@ const UserManagement = () => {
 
       await updateUser(selectedUser.id, operations);
 
-      // Update roles for the user
-      await assignRolesToUser(selectedUser.id);
+      // Update permissions for the user
+      await assignPermissionsToUser(selectedUser.id);
 
       toast({
         title: "Success",
-        description: "User updated and roles assigned successfully",
+        description: "User updated with permissions assigned successfully",
       });
 
       setShowEditDialog(false);
@@ -249,39 +244,43 @@ const UserManagement = () => {
     }
   };
 
-  const assignRolesToUser = async (userId: string) => {
+  const assignPermissionsToUser = async (userId: string) => {
     try {
-      for (const assignment of roleAssignments) {
-        const roles = [];
+      // Assign collection-wise permissions to selected collections
+      if (permissionCollections.length > 0 && (selectedPermissions.read || selectedPermissions.admin || selectedPermissions.upload)) {
+        for (const collectionId of permissionCollections) {
+          const collection = collections.find(c => (c.id || c.uuid) === collectionId);
+          if (!collection) continue;
 
-        if (assignment.submitter) {
-          roles.push(`${assignment.collectionName}_Upload`);
-        }
-        if (assignment.reviewer) {
-          roles.push(`${assignment.collectionName}_Reviewer`);
-        }
-        if (assignment.editor) {
-          roles.push(`${assignment.collectionName}_Editor`);
-        }
-        if (assignment.finalEditor) {
-          roles.push(`${assignment.collectionName}_FinalEditor`);
-        }
+          const collectionName = collection.metadata?.["dc.title"]?.[0]?.value || collection.name;
+          const permissions = [];
 
-        // Add user to each selected role group
-        for (const roleName of roles) {
-          try {
-            const groupsResult = await searchGroups(roleName, 0, 10);
-            if (groupsResult.groups && groupsResult.groups.length > 0) {
-              const group = groupsResult.groups[0];
-              await addMemberToGroup(group.id || group.uuid, userId);
+          if (selectedPermissions.read) {
+            permissions.push(`${collectionName}_Read`);
+          }
+          if (selectedPermissions.admin) {
+            permissions.push(`${collectionName}_Admin`);
+          }
+          if (selectedPermissions.upload) {
+            permissions.push(`${collectionName}_Upload`);
+          }
+
+          // Add user to each selected permission group
+          for (const permName of permissions) {
+            try {
+              const groupsResult = await searchGroups(permName, 0, 10);
+              if (groupsResult.groups && groupsResult.groups.length > 0) {
+                const group = groupsResult.groups[0];
+                await addMemberToGroup(group.id || group.uuid, userId);
+              }
+            } catch (error) {
+              console.error(`Failed to add user to permission group ${permName}:`, error);
             }
-          } catch (error) {
-            console.error(`Failed to add user to group ${roleName}:`, error);
           }
         }
       }
     } catch (error) {
-      console.error("Assign roles error:", error);
+      console.error("Assign permissions error:", error);
       throw error;
     }
   };
@@ -312,7 +311,7 @@ const UserManagement = () => {
 
   const openAddDialog = () => {
     resetForm();
-    initializeRoleAssignments();
+    initializePermissions();
     setShowAddDialog(true);
   };
 
@@ -325,7 +324,7 @@ const UserManagement = () => {
       phone: "",
       canLogIn: user.canLogIn,
     });
-    initializeRoleAssignments();
+    initializePermissions();
     setShowEditDialog(true);
   };
 
@@ -342,16 +341,22 @@ const UserManagement = () => {
       phone: "",
       canLogIn: true,
     });
-    setRoleAssignments([]);
+    setSelectedPermissions({ read: false, admin: false, upload: false });
+    setPermissionCollections([]);
   };
 
-  const toggleRole = (collectionId: string, role: keyof Omit<RoleAssignment, 'collectionId' | 'collectionName'>) => {
-    setRoleAssignments((prev) =>
-      prev.map((assignment) =>
-        assignment.collectionId === collectionId
-          ? { ...assignment, [role]: !assignment[role] }
-          : assignment
-      )
+  const toggleSelectedPermission = (permission: keyof SelectedPermissions) => {
+    setSelectedPermissions((prev) => ({
+      ...prev,
+      [permission]: !prev[permission],
+    }));
+  };
+
+  const togglePermissionCollection = (collectionId: string) => {
+    setPermissionCollections((prev) =>
+      prev.includes(collectionId)
+        ? prev.filter((id) => id !== collectionId)
+        : [...prev, collectionId]
     );
   };
 
@@ -366,7 +371,7 @@ const UserManagement = () => {
               User Management
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage system users and assign collection roles
+              Manage system users and grant collection permissions
             </p>
           </div>
           <Button onClick={openAddDialog}>
@@ -489,7 +494,7 @@ const UserManagement = () => {
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
             <DialogDescription>
-              Create a new user account and assign collection roles
+              Create a new user account and grant collection permissions
             </DialogDescription>
           </DialogHeader>
 
@@ -565,96 +570,84 @@ const UserManagement = () => {
               </div>
             </div>
 
-            {/* Role Assignment Section */}
-            <div className="space-y-4">
+            {/* Collection-Wise Permissions Section */}
+            <div className="space-y-4 border-t pt-4">
               <h3 className="font-semibold flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Assign Collection Roles
+                <Lock className="h-4 w-4" />
+                Collection-Wise Permissions
               </h3>
 
-              {roleAssignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No collections available
-                </p>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {roleAssignments.map((assignment) => (
-                    <div
-                      key={assignment.collectionId}
-                      className="border rounded-lg p-3 space-y-2"
-                    >
-                      <p className="font-medium text-sm">
-                        {assignment.collectionName}
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${assignment.collectionId}-submitter`}
-                            checked={assignment.submitter}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "submitter")
-                            }
-                          />
-                          <Label
-                            htmlFor={`${assignment.collectionId}-submitter`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Submitter
-                          </Label>
-                        </div>
+              {/* Permission Selection */}
+              <div className="space-y-3 border rounded-lg p-4 bg-blue-50 dark:bg-blue-950">
+                <p className="text-sm font-medium">Select permissions to assign:</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="perm-read"
+                      checked={selectedPermissions.read}
+                      onCheckedChange={() => toggleSelectedPermission("read")}
+                    />
+                    <Label htmlFor="perm-read" className="text-sm cursor-pointer">
+                      Read
+                    </Label>
+                  </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${assignment.collectionId}-reviewer`}
-                            checked={assignment.reviewer}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "reviewer")
-                            }
-                          />
-                          <Label
-                            htmlFor={`${assignment.collectionId}-reviewer`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Reviewer
-                          </Label>
-                        </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="perm-upload"
+                      checked={selectedPermissions.upload}
+                      onCheckedChange={() => toggleSelectedPermission("upload")}
+                    />
+                    <Label htmlFor="perm-upload" className="text-sm cursor-pointer">
+                      Upload
+                    </Label>
+                  </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${assignment.collectionId}-editor`}
-                            checked={assignment.editor}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "editor")
-                            }
-                          />
-                          <Label
-                            htmlFor={`${assignment.collectionId}-editor`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Editor
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`${assignment.collectionId}-finalEditor`}
-                            checked={assignment.finalEditor}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "finalEditor")
-                            }
-                          />
-                          <Label
-                            htmlFor={`${assignment.collectionId}-finalEditor`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Final Editor
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="perm-admin"
+                      checked={selectedPermissions.admin}
+                      onCheckedChange={() => toggleSelectedPermission("admin")}
+                    />
+                    <Label htmlFor="perm-admin" className="text-sm cursor-pointer">
+                      Admin
+                    </Label>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Collection Selection */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Select collections to apply permissions:</p>
+                {collections.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No collections available
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-3">
+                    {collections.map((collection) => {
+                      const collectionId = collection.id || collection.uuid;
+                      const collectionName = collection.metadata?.["dc.title"]?.[0]?.value || collection.name;
+
+                      return (
+                        <div key={collectionId} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`collection-${collectionId}`}
+                            checked={permissionCollections.includes(collectionId)}
+                            onCheckedChange={() => togglePermissionCollection(collectionId)}
+                          />
+                          <Label
+                            htmlFor={`collection-${collectionId}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            {collectionName}
+                          </Label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -678,7 +671,7 @@ const UserManagement = () => {
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
             <DialogDescription>
-              Update user information and assign collection roles
+              Update user information and grant collection permissions
             </DialogDescription>
           </DialogHeader>
 
@@ -742,96 +735,84 @@ const UserManagement = () => {
               </div>
             </div>
 
-            {/* Role Assignment Section */}
-            <div className="space-y-4">
+            {/* Collection-Wise Permissions Section */}
+            <div className="space-y-4 border-t pt-4">
               <h3 className="font-semibold flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Assign Collection Roles
+                <Lock className="h-4 w-4" />
+                Collection-Wise Permissions
               </h3>
 
-              {roleAssignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No collections available
-                </p>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {roleAssignments.map((assignment) => (
-                    <div
-                      key={assignment.collectionId}
-                      className="border rounded-lg p-3 space-y-2"
-                    >
-                      <p className="font-medium text-sm">
-                        {assignment.collectionName}
-                      </p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-${assignment.collectionId}-submitter`}
-                            checked={assignment.submitter}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "submitter")
-                            }
-                          />
-                          <Label
-                            htmlFor={`edit-${assignment.collectionId}-submitter`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Submitter
-                          </Label>
-                        </div>
+              {/* Permission Selection */}
+              <div className="space-y-3 border rounded-lg p-4 bg-blue-50 dark:bg-blue-950">
+                <p className="text-sm font-medium">Select permissions to assign:</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-perm-read"
+                      checked={selectedPermissions.read}
+                      onCheckedChange={() => toggleSelectedPermission("read")}
+                    />
+                    <Label htmlFor="edit-perm-read" className="text-sm cursor-pointer">
+                      Read
+                    </Label>
+                  </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-${assignment.collectionId}-reviewer`}
-                            checked={assignment.reviewer}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "reviewer")
-                            }
-                          />
-                          <Label
-                            htmlFor={`edit-${assignment.collectionId}-reviewer`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Reviewer
-                          </Label>
-                        </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-perm-upload"
+                      checked={selectedPermissions.upload}
+                      onCheckedChange={() => toggleSelectedPermission("upload")}
+                    />
+                    <Label htmlFor="edit-perm-upload" className="text-sm cursor-pointer">
+                      Upload
+                    </Label>
+                  </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-${assignment.collectionId}-editor`}
-                            checked={assignment.editor}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "editor")
-                            }
-                          />
-                          <Label
-                            htmlFor={`edit-${assignment.collectionId}-editor`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Editor
-                          </Label>
-                        </div>
-
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`edit-${assignment.collectionId}-finalEditor`}
-                            checked={assignment.finalEditor}
-                            onCheckedChange={() =>
-                              toggleRole(assignment.collectionId, "finalEditor")
-                            }
-                          />
-                          <Label
-                            htmlFor={`edit-${assignment.collectionId}-finalEditor`}
-                            className="text-xs cursor-pointer"
-                          >
-                            Final Editor
-                          </Label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-perm-admin"
+                      checked={selectedPermissions.admin}
+                      onCheckedChange={() => toggleSelectedPermission("admin")}
+                    />
+                    <Label htmlFor="edit-perm-admin" className="text-sm cursor-pointer">
+                      Admin
+                    </Label>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Collection Selection */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Select collections to apply permissions:</p>
+                {collections.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No collections available
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg p-3">
+                    {collections.map((collection) => {
+                      const collectionId = collection.id || collection.uuid;
+                      const collectionName = collection.metadata?.["dc.title"]?.[0]?.value || collection.name;
+
+                      return (
+                        <div key={collectionId} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`edit-collection-${collectionId}`}
+                            checked={permissionCollections.includes(collectionId)}
+                            onCheckedChange={() => togglePermissionCollection(collectionId)}
+                          />
+                          <Label
+                            htmlFor={`edit-collection-${collectionId}`}
+                            className="text-sm cursor-pointer"
+                          >
+                            {collectionName}
+                          </Label>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

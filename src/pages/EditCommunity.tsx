@@ -404,7 +404,12 @@ const EditCommunity = () => {
   // --- Create Handlers ---
   const handleOpenCreate = (type: "community" | "collection", parentId: string = "") => {
     setCreateType(type);
-    setCreateParentId(parentId);
+    if (type === "collection") {
+      // Always require user to select parent for collections, don't pre-set
+      setCreateParentId("");
+    } else {
+      setCreateParentId(parentId);
+    }
     setCreateTitle("");
     setCreateDescription("");
     setCreateModalOpen(true);
@@ -413,6 +418,11 @@ const EditCommunity = () => {
   const handleCreate = async () => {
     if (!createTitle.trim()) {
       toast({ title: "Validation Error", description: "Title is required", variant: "destructive" });
+      return;
+    }
+
+    if (createType === "collection" && !createParentId) {
+      toast({ title: "Validation Error", description: "Please select a parent community or sub-community", variant: "destructive" });
       return;
     }
 
@@ -440,10 +450,6 @@ const EditCommunity = () => {
           toast({ title: "Success", description: "Community created successfully!" });
         }
       } else {
-        if (!createParentId) {
-          toast({ title: "Error", description: "Please select a parent community", variant: "destructive" });
-          return;
-        }
         const result = await createCollection(createParentId, {
           "dc.title": [{ value: createTitle }],
           ...(createDescription ? { "dc.description": [{ value: createDescription }] } : {}),
@@ -818,10 +824,35 @@ const EditCommunity = () => {
                   ? createParentId
                     ? "Create a new sub-community under the selected community"
                     : "Create a new top-level community"
-                  : "Create a new collection"}
+                  : "Create a new collection under a community or sub-community"}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-2">
+              {createType === "collection" && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Parent Community/Sub-Community *</label>
+                  <select
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
+                    value={createParentId}
+                    onChange={(e) => setCreateParentId(e.target.value)}
+                  >
+                    <option value="">Select a parent community or sub-community</option>
+                    {communities.map((c) => (
+                      <optgroup key={c.uuid} label={`📁 ${getTitle(c)}`}>
+                        <option value={c.uuid}>{getTitle(c)}</option>
+                        {subCommunities[c.uuid]?.map((sub) => (
+                          <option key={sub.uuid} value={sub.uuid}>
+                            {'  ↳ ' + getTitle(sub)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {!createParentId && (
+                    <p className="text-xs text-destructive">Parent community is required</p>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Title *</label>
                 <Input
@@ -839,23 +870,6 @@ const EditCommunity = () => {
                   onChange={(e) => setCreateDescription(e.target.value)}
                 />
               </div>
-              {createType === "collection" && !createParentId && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Parent Community *</label>
-                  <select
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm"
-                    value={createParentId}
-                    onChange={(e) => setCreateParentId(e.target.value)}
-                  >
-                    <option value="">Select a community</option>
-                    {communities.map((c) => (
-                      <option key={c.uuid} value={c.uuid}>
-                        {getTitle(c)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateModalOpen(false)}>

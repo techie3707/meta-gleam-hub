@@ -14,9 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FolderPlus, Info } from "lucide-react";
+import { Loader2, FolderPlus, Info, CheckCircle, Users } from "lucide-react";
 import { createCollection } from "@/api/collectionApi";
 import { fetchCommunities, Community } from "@/api/communityApi";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 
 const CreateCollection = () => {
@@ -30,6 +31,8 @@ const CreateCollection = () => {
   
   const [collectionName, setCollectionName] = useState("");
   const [description, setDescription] = useState("");
+  const [creationStep, setCreationStep] = useState<"idle" | "creating" | "groups">("idle");
+  const [creationMessage, setCreationMessage] = useState("");
 
   useEffect(() => {
     loadCommunities();
@@ -89,6 +92,8 @@ const CreateCollection = () => {
     }
 
     setLoading(true);
+    setCreationStep("creating");
+    setCreationMessage("Creating collection...");
 
     try {
       const metadata = {
@@ -105,14 +110,28 @@ const CreateCollection = () => {
         throw new Error("Failed to create collection");
       }
 
+      // Update status to show groups are being created
+      setCreationStep("groups");
+      setCreationMessage("Creating permission groups...");
+
       toast({
-        title: "Success!",
-        description: `Collection "${collectionName}" created successfully`,
+        title: "Collection Created!",
+        description: `Collection "${collectionName}" has been created successfully. Permission groups are being set up automatically...`,
       });
 
-      navigate("/collections");
+      // Wait a bit for groups to be created
+      setTimeout(() => {
+        toast({
+          title: "Permission Groups Created",
+          description: `Three permission groups have been automatically created:\n• ${collectionName}_Read (View access)\n• ${collectionName}_Admin (Full control)\n• ${collectionName}_Upload (Submit items)`,
+        });
+
+        setCreationStep("idle");
+        navigate("/collections");
+      }, 2000);
     } catch (error: any) {
       console.error("Error creating collection:", error);
+      setCreationStep("idle");
       toast({
         title: "Error",
         description: error.message || "Failed to create collection",
@@ -134,6 +153,31 @@ const CreateCollection = () => {
             </CardHeader>
             <CardContent className="pb-6">
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Info Alert about Automatic Group Creation */}
+                <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+                  <Users className="h-4 w-4" />
+                  <AlertDescription className="ml-2">
+                    <strong>Permission Groups:</strong> When you create a collection, three permission groups are automatically generated:
+                    <ul className="mt-2 ml-4 space-y-1 text-sm list-disc">
+                      <li><strong>{collectionName || "CollectionName"}_Read</strong> - Users can view collection items</li>
+                      <li><strong>{collectionName || "CollectionName"}_Admin</strong> - Full administrative control</li>
+                      <li><strong>{collectionName || "CollectionName"}_Upload</strong> - Users can submit items</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+
+                {/* Creation Progress */}
+                {creationStep !== "idle" && (
+                  <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <AlertDescription>
+                        <strong>{creationMessage}</strong>
+                        {creationStep === "groups" && " This may take a few seconds..."}
+                      </AlertDescription>
+                    </div>
+                  </Alert>
+                )}
                 {/* Community Selection */}
                 <div className="space-y-3">
                   <div className="mb-3">

@@ -117,6 +117,10 @@ const Documents = () => {
                 id: item.id,
                 title:
                   item.metadata?.["dc.title"]?.[0]?.value ||
+                  item.metadata?.["dc.DocNumber"]?.[0]?.value ||
+                  item.metadata?.["dc.assetid"]?.[0]?.value ||
+                  item.metadata?.["dc.empid"]?.[0]?.value ||
+                  item.metadata?.["dc.ContractOwner"]?.[0]?.value ||
                   item.name ||
                   "Untitled",
                 type: "pdf" as const,
@@ -152,6 +156,10 @@ const Documents = () => {
                 id: item.id,
                 title:
                   item.metadata?.["dc.title"]?.[0]?.value ||
+                  item.metadata?.["dc.DocNumber"]?.[0]?.value ||
+                  item.metadata?.["dc.assetid"]?.[0]?.value ||
+                  item.metadata?.["dc.empid"]?.[0]?.value ||
+                  item.metadata?.["dc.ContractOwner"]?.[0]?.value ||
                   item.name ||
                   "Untitled",
                 type: "pdf" as const,
