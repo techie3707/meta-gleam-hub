@@ -153,6 +153,28 @@
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground/80 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
   }
 
+  /* Custom scrollbar for the sidebar to integrate it with sidebar background */
+  aside nav::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  aside nav::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  aside nav::-webkit-scrollbar-thumb {
+    background-color: rgba(255,255,255,0.06);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
+  /* Firefox scrollbar styling */
+  aside nav {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.06) transparent;
+  }
+
   .sidebar-item-active {
     @apply bg-sidebar-accent text-sidebar-primary font-medium;
   }
